@@ -222,10 +222,10 @@ public class DashboardService {
 
         // Audit activity can be connected here when the
         // audit-log repository is available.
-        data.put(
-                "recentActivity",
-                new ArrayList<>()
-        );
+        // data.put(
+        //         "recentActivity",
+        //         new ArrayList<>()
+        // );
 
         return data;
     }
