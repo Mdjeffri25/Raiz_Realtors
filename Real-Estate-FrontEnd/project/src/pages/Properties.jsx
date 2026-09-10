@@ -307,14 +307,22 @@ export default function Properties() {
       //   }
       // });
 
-      await axiosClient.post('/units', {
+//       await axiosClient.post('/units', {
+//   unitNumber: unitForm.unitNumber.trim(),
+//   type: unitForm.type,
+//   price: Number(unitForm.price),
+//   status: unitForm.status,
+//   buildingId: Number(unitForm.buildingId)
+// });
+
+
+await axiosClient.post('/units', {
   unitNumber: unitForm.unitNumber.trim(),
   type: unitForm.type,
   price: Number(unitForm.price),
   status: unitForm.status,
   buildingId: Number(unitForm.buildingId)
 });
-
       showSuccess(
         `Unit ${unitForm.unitNumber} added successfully.`
       );
