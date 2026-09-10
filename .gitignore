@@ -1,0 +1,20 @@
+# Frontend
+Real-Estate-FrontEnd/node_modules/
+Real-Estate-FrontEnd/dist/
+Real-Estate-FrontEnd/.env
+Real-Estate-FrontEnd/.env.local
+
+# Backend
+Real-Estate-BackEnd/target/
+Real-Estate-BackEnd/.env
+
+# IntelliJ
+.idea/
+*.iml
+
+# VS Code
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
