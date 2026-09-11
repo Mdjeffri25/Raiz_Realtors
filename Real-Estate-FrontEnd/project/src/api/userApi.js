@@ -1,15 +1,23 @@
 import axiosClient from './axiosClient';
 
 const userApi = {
-  getAll: () => axiosClient.get('/users'),
+  getAll: () =>
+    axiosClient.get('/users'),
 
-  getById: (id) => axiosClient.get(`/users/${id}`),
+  getById: (id) =>
+    axiosClient.get(`/users/${id}`),
 
-  create: (data) => axiosClient.post('/users', data),
+  create: (data) =>
+    axiosClient.post('/users', data),
 
-  update: (id, data) => axiosClient.put(`/users/${id}`, data),
+  update: (id, data) =>
+    axiosClient.put(`/users/${id}`, data),
 
-  remove: (id) => axiosClient.delete(`/users/${id}`),
+  remove: (id) =>
+    axiosClient.delete(`/users/${id}`),
+
+  changePassword: (data) =>
+    axiosClient.put('/users/change-password', data),
 };
 
 export default userApi;

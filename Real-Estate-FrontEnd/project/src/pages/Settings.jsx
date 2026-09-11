@@ -1,9 +1,12 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import userApi from '../api/userApi';
+
 import PageHeader from '../components/ui/PageHeader';
 import Button from '../components/ui/Button';
 import { Input } from '../components/ui/FormField';
+
 import {
   User,
   Shield,
@@ -14,14 +17,27 @@ import {
 
 export default function Settings() {
   const { user } = useAuth();
-  const { showSuccess } = useToast();
+  const { showSuccess, showError } = useToast();
+
+  // =========================
+  // PROFILE
+  // =========================
 
   const [name, setName] = useState(user?.name || '');
   const [email] = useState(user?.email || '');
 
+  // =========================
+  // PASSWORD
+  // =========================
+
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordLoading, setPasswordLoading] = useState(false);
+
+  // =========================
+  // PROFILE SAVE
+  // =========================
 
   const handleProfileSave = (e) => {
     e.preventDefault();
@@ -29,23 +45,63 @@ export default function Settings() {
     showSuccess('Profile settings saved successfully.');
   };
 
-  const handlePasswordSave = (e) => {
+  // =========================
+  // CHANGE PASSWORD
+  // =========================
+
+  const handlePasswordSave = async (e) => {
     e.preventDefault();
 
-    if (!currentPassword || !newPassword || !confirmPassword) {
+    if (
+      !currentPassword ||
+      !newPassword ||
+      !confirmPassword
+    ) {
+      showError('Please fill in all password fields.');
       return;
     }
 
     if (newPassword !== confirmPassword) {
+      showError('New passwords do not match.');
       return;
     }
 
-    showSuccess('Password settings updated successfully.');
+    if (newPassword.length < 6) {
+      showError(
+        'New password must contain at least 6 characters.'
+      );
+      return;
+    }
 
-    setCurrentPassword('');
-    setNewPassword('');
-    setConfirmPassword('');
+    setPasswordLoading(true);
+
+    try {
+      await userApi.changePassword({
+        currentPassword,
+        newPassword,
+      });
+
+      showSuccess(
+        'Password changed successfully.'
+      );
+
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+
+    } catch (err) {
+      showError(
+        err.message ||
+          'Unable to change password.'
+      );
+    } finally {
+      setPasswordLoading(false);
+    }
   };
+
+  // =========================
+  // ROLE
+  // =========================
 
   const roleLabel = user?.role
     ? user.role.replaceAll('_', ' ')
@@ -53,6 +109,7 @@ export default function Settings() {
 
   return (
     <div>
+
       <PageHeader
         title="Settings"
         description="Manage your profile, security, and CRM preferences."
@@ -60,20 +117,25 @@ export default function Settings() {
 
       <div className="space-y-6">
 
-        {/* ================= PROFILE ================= */}
+        {/* ================================================= */}
+        {/* PROFILE */}
+        {/* ================================================= */}
 
         <section className="rounded-lg border border-raiz-border bg-white">
 
           <div className="flex items-start gap-4 border-b border-raiz-border px-6 py-5">
 
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-raiz-offwhite border border-raiz-border">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-raiz-border bg-raiz-offwhite">
+
               <User
                 size={18}
                 className="text-raiz-black"
               />
+
             </div>
 
             <div>
+
               <h2 className="text-sm font-semibold text-raiz-black">
                 Profile
               </h2>
@@ -81,6 +143,7 @@ export default function Settings() {
               <p className="mt-1 text-xs text-raiz-secondary">
                 Manage your personal CRM profile information.
               </p>
+
             </div>
 
           </div>
@@ -95,7 +158,9 @@ export default function Settings() {
               <Input
                 label="Full Name"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) =>
+                  setName(e.target.value)
+                }
                 placeholder="Enter your name"
               />
 
@@ -122,20 +187,25 @@ export default function Settings() {
         </section>
 
 
-        {/* ================= ACCOUNT INFORMATION ================= */}
+        {/* ================================================= */}
+        {/* ACCOUNT & ACCESS */}
+        {/* ================================================= */}
 
         <section className="rounded-lg border border-raiz-border bg-white">
 
           <div className="flex items-start gap-4 border-b border-raiz-border px-6 py-5">
 
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-raiz-offwhite border border-raiz-border">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-raiz-border bg-raiz-offwhite">
+
               <Shield
                 size={18}
                 className="text-raiz-black"
               />
+
             </div>
 
             <div>
+
               <h2 className="text-sm font-semibold text-raiz-black">
                 Account & Access
               </h2>
@@ -143,6 +213,7 @@ export default function Settings() {
               <p className="mt-1 text-xs text-raiz-secondary">
                 Current account permissions and access information.
               </p>
+
             </div>
 
           </div>
@@ -170,20 +241,25 @@ export default function Settings() {
         </section>
 
 
-        {/* ================= SECURITY ================= */}
+        {/* ================================================= */}
+        {/* SECURITY */}
+        {/* ================================================= */}
 
         <section className="rounded-lg border border-raiz-border bg-white">
 
           <div className="flex items-start gap-4 border-b border-raiz-border px-6 py-5">
 
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-raiz-offwhite border border-raiz-border">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-raiz-border bg-raiz-offwhite">
+
               <Shield
                 size={18}
                 className="text-raiz-black"
               />
+
             </div>
 
             <div>
+
               <h2 className="text-sm font-semibold text-raiz-black">
                 Security
               </h2>
@@ -191,6 +267,7 @@ export default function Settings() {
               <p className="mt-1 text-xs text-raiz-secondary">
                 Update your account password.
               </p>
+
             </div>
 
           </div>
@@ -210,6 +287,7 @@ export default function Settings() {
                   setCurrentPassword(e.target.value)
                 }
                 placeholder="Current password"
+                disabled={passwordLoading}
               />
 
               <Input
@@ -220,6 +298,7 @@ export default function Settings() {
                   setNewPassword(e.target.value)
                 }
                 placeholder="New password"
+                disabled={passwordLoading}
               />
 
               <Input
@@ -230,9 +309,12 @@ export default function Settings() {
                   setConfirmPassword(e.target.value)
                 }
                 placeholder="Confirm password"
+                disabled={passwordLoading}
               />
 
             </div>
+
+            {/* Password mismatch */}
 
             {newPassword &&
               confirmPassword &&
@@ -242,15 +324,27 @@ export default function Settings() {
                 </p>
               )}
 
+            {/* Password length */}
+
+            {newPassword &&
+              newPassword.length < 6 && (
+                <p className="mt-3 text-xs text-raiz-secondary">
+                  Password must contain at least 6 characters.
+                </p>
+              )}
+
             <div className="mt-5 flex justify-end">
 
               <Button
                 type="submit"
+                loading={passwordLoading}
                 disabled={
+                  passwordLoading ||
                   !currentPassword ||
                   !newPassword ||
                   !confirmPassword ||
-                  newPassword !== confirmPassword
+                  newPassword !== confirmPassword ||
+                  newPassword.length < 6
                 }
               >
                 Update Password
@@ -263,20 +357,25 @@ export default function Settings() {
         </section>
 
 
-        {/* ================= CRM INFORMATION ================= */}
+        {/* ================================================= */}
+        {/* CRM INFORMATION */}
+        {/* ================================================= */}
 
         <section className="rounded-lg border border-raiz-border bg-white">
 
           <div className="flex items-start gap-4 border-b border-raiz-border px-6 py-5">
 
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-raiz-offwhite border border-raiz-border">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-raiz-border bg-raiz-offwhite">
+
               <Building2
                 size={18}
                 className="text-raiz-black"
               />
+
             </div>
 
             <div>
+
               <h2 className="text-sm font-semibold text-raiz-black">
                 CRM Information
               </h2>
@@ -284,6 +383,7 @@ export default function Settings() {
               <p className="mt-1 text-xs text-raiz-secondary">
                 Platform information for RAIZ REALTORS.
               </p>
+
             </div>
 
           </div>
@@ -315,17 +415,21 @@ export default function Settings() {
         </section>
 
 
-        {/* ================= SYSTEM STATUS ================= */}
+        {/* ================================================= */}
+        {/* SYSTEM STATUS */}
+        {/* ================================================= */}
 
         <section className="rounded-lg border border-raiz-border bg-raiz-offwhite">
 
           <div className="flex items-center gap-4 px-6 py-5">
 
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-white border border-raiz-border">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-raiz-border bg-white">
+
               <Database
                 size={18}
                 className="text-raiz-black"
               />
+
             </div>
 
             <div className="flex-1">
@@ -353,7 +457,9 @@ export default function Settings() {
         </section>
 
 
-        {/* ================= FOOTER ================= */}
+        {/* ================================================= */}
+        {/* FOOTER */}
+        {/* ================================================= */}
 
         <div className="pb-6 text-center">
 
@@ -368,14 +474,21 @@ export default function Settings() {
         </div>
 
       </div>
+
     </div>
   );
 }
 
 
-/* ================= INFO ITEM ================= */
+/* ================================================= */
+/* INFO ITEM */
+/* ================================================= */
 
-function InfoItem({ label, value, status = false }) {
+function InfoItem({
+  label,
+  value,
+  status = false,
+}) {
   return (
     <div className="rounded-md border border-raiz-border bg-raiz-offwhite/40 px-4 py-3">
 
