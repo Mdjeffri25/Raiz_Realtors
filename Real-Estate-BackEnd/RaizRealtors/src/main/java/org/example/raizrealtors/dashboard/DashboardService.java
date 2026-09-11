@@ -1,20 +1,19 @@
 package org.example.raizrealtors.dashboard;
 
 import lombok.RequiredArgsConstructor;
+import org.example.raizrealtors.audit.AuditLogRepository;
 import org.example.raizrealtors.booking.Booking;
 import org.example.raizrealtors.booking.BookingRepository;
+import org.example.raizrealtors.lead.Lead;
 import org.example.raizrealtors.lead.LeadRepository;
 import org.example.raizrealtors.lead.LeadStage;
 import org.example.raizrealtors.property.Unit;
 import org.example.raizrealtors.property.UnitRepository;
 import org.example.raizrealtors.property.UnitStatus;
 import org.springframework.stereotype.Service;
-import org.example.raizrealtors.audit.AuditLog;
-import org.example.raizrealtors.audit.AuditLogRepository;
 
 import java.time.LocalDate;
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -30,19 +29,45 @@ public class DashboardService {
         Map<String, Object> data = new LinkedHashMap<>();
 
         // =========================
+        // LEAD STAGE COUNTS
+        // =========================
+
+        Map<LeadStage, Long> stageCounts =
+                new EnumMap<>(LeadStage.class);
+
+        for (Object[] row : leadRepository.countLeadsByStage()) {
+
+            LeadStage stage = (LeadStage) row[0];
+            Long count = (Long) row[1];
+
+            if (stage != null) {
+                stageCounts.put(stage, count);
+            }
+        }
+
+        // =========================
         // TOP METRICS
         // =========================
 
-        data.put("totalLeads", leadRepository.count());
+        data.put(
+                "totalLeads",
+                leadRepository.count()
+        );
 
         data.put(
                 "qualified",
-                leadRepository.countByStage(LeadStage.INTERESTED)
+                stageCounts.getOrDefault(
+                        LeadStage.INTERESTED,
+                        0L
+                )
         );
 
         data.put(
                 "bookedLeads",
-                leadRepository.countByStage(LeadStage.BOOKED)
+                stageCounts.getOrDefault(
+                        LeadStage.BOOKED,
+                        0L
+                )
         );
 
         data.put(
@@ -52,31 +77,48 @@ public class DashboardService {
 
         data.put(
                 "availableUnits",
-                unitRepository.countByStatus(UnitStatus.AVAILABLE)
+                unitRepository.countByStatus(
+                        UnitStatus.AVAILABLE
+                )
         );
-  data.put(
-        "recentActivity",
-        auditLogRepository.findTop5ByOrderByTimestampDesc()
-);
+
+        // =========================
+        // RECENT ACTIVITY
+        // =========================
+
+        data.put(
+                "recentActivity",
+                auditLogRepository.findTop5ByOrderByTimestampDesc()
+        );
+
+        // =========================
+        // FOLLOW-UPS TODAY
+        // =========================
+
+        LocalDate today = LocalDate.now();
+
         data.put(
                 "todayFollowUps",
-                leadRepository.countByFollowUpDate(LocalDate.now())
+                leadRepository.countByFollowUpDate(today)
         );
 
         // =========================
         // SALES PIPELINE
         // =========================
 
-        List<Map<String, Object>> pipeline = new ArrayList<>();
+        List<Map<String, Object>> pipeline =
+                new ArrayList<>();
 
         for (LeadStage stage : LeadStage.values()) {
 
-            Map<String, Object> item = new LinkedHashMap<>();
+            Map<String, Object> item =
+                    new LinkedHashMap<>();
 
             item.put("stage", stage.name());
+
             item.put(
                     "count",
-                    leadRepository.countByStage(stage)
+                    stageCounts.getOrDefault(stage, 0L)
             );
 
             pipeline.add(item);
@@ -88,15 +130,25 @@ public class DashboardService {
         // FOLLOW-UPS TODAY
         // =========================
 
-        List<Map<String, Object>> followUps = new ArrayList<>();
+        List<Map<String, Object>> followUps =
+                new ArrayList<>();
 
-        leadRepository.findByFollowUpDate(LocalDate.now())
+        leadRepository.findByFollowUpDate(today)
                 .forEach(lead -> {
 
-                    Map<String, Object> item = new LinkedHashMap<>();
+                    Map<String, Object> item =
+                            new LinkedHashMap<>();
 
-                    item.put("leadName", lead.getName());
-                    item.put("followUpDate", lead.getFollowUpDate());
+                    item.put(
+                            "leadName",
+                            lead.getName()
+                    );
+
+                    item.put(
+                            "followUpDate",
+                            lead.getFollowUpDate()
+                    );
+
                     item.put(
                             "stage",
                             lead.getStage() != null
@@ -107,15 +159,20 @@ public class DashboardService {
                     followUps.add(item);
                 });
 
-        data.put("followUpsToday", followUps);
+        data.put(
+                "followUpsToday",
+                followUps
+        );
 
         // =========================
         // UNIT AVAILABILITY
         // =========================
 
-        Map<Long, Map<String, Object>> projectMap = new LinkedHashMap<>();
+        Map<Long, Map<String, Object>> projectMap =
+                new LinkedHashMap<>();
 
-        List<Unit> units = unitRepository.findAll();
+        List<Unit> units =
+                unitRepository.findAll();
 
         for (Unit unit : units) {
 
@@ -124,43 +181,65 @@ public class DashboardService {
                 continue;
             }
 
-            Long projectId = unit.getBuilding()
-                    .getProject()
-                    .getId();
+            Long projectId =
+                    unit.getBuilding()
+                            .getProject()
+                            .getId();
 
-            String projectName = unit.getBuilding()
-                    .getProject()
-                    .getName();
+            String projectName =
+                    unit.getBuilding()
+                            .getProject()
+                            .getName();
 
             Map<String, Object> project =
-                    projectMap.computeIfAbsent(projectId, id -> {
+                    projectMap.computeIfAbsent(
+                            projectId,
+                            id -> {
 
-                        Map<String, Object> p = new LinkedHashMap<>();
+                                Map<String, Object> p =
+                                        new LinkedHashMap<>();
 
-                        p.put("name", projectName);
-                        p.put("totalUnits", 0);
-                        p.put("availableUnits", 0);
+                                p.put(
+                                        "name",
+                                        projectName
+                                );
 
-                        return p;
-                    });
+                                p.put(
+                                        "totalUnits",
+                                        0
+                                );
+
+                                p.put(
+                                        "availableUnits",
+                                        0
+                                );
+
+                                return p;
+                            }
+                    );
 
             project.put(
                     "totalUnits",
                     (Integer) project.get("totalUnits") + 1
             );
 
-            if (unit.getStatus() == UnitStatus.AVAILABLE) {
+            if (unit.getStatus() ==
+                    UnitStatus.AVAILABLE) {
 
                 project.put(
                         "availableUnits",
-                        (Integer) project.get("availableUnits") + 1
+                        (Integer) project.get(
+                                "availableUnits"
+                        ) + 1
                 );
             }
         }
 
         data.put(
                 "unitAvailability",
-                new ArrayList<>(projectMap.values())
+                new ArrayList<>(
+                        projectMap.values()
+                )
         );
 
         // =========================
@@ -168,17 +247,9 @@ public class DashboardService {
         // =========================
 
         List<Map<String, Object>> recentBookings =
-                bookingRepository.findAll()
+                bookingRepository
+                        .findTop6ByOrderByBookingDateDesc()
                         .stream()
-                        .sorted(
-                                Comparator.comparing(
-                                        Booking::getBookingDate,
-                                        Comparator.nullsLast(
-                                                Comparator.reverseOrder()
-                                        )
-                                )
-                        )
-                        .limit(6)
                         .map(booking -> {
 
                             Map<String, Object> item =
@@ -212,20 +283,12 @@ public class DashboardService {
 
                             return item;
                         })
-                        .collect(Collectors.toList());
+                        .toList();
 
-        data.put("recentBookings", recentBookings);
-
-        // =========================
-        // RECENT ACTIVITY
-        // =========================
-
-        // Audit activity can be connected here when the
-        // audit-log repository is available.
-        // data.put(
-        //         "recentActivity",
-        //         new ArrayList<>()
-        // );
+        data.put(
+                "recentBookings",
+                recentBookings
+        );
 
         return data;
     }
