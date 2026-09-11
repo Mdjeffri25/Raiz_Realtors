@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { Input } from '../components/ui/FormField';
 import Button from '../components/ui/Button';
+import axiosClient from '../api/axiosClient';
 
 export default function Login() {
   const { login } = useAuth();
@@ -16,8 +17,48 @@ export default function Login() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // Backend connection status
+  const [backendReady, setBackendReady] = useState(false);
+
   const from =
     location.state?.from?.pathname || '/dashboard';
+
+  // Wake Render backend when login page opens
+  useEffect(() => {
+    let cancelled = false;
+
+    const wakeBackend = async () => {
+      for (let attempt = 1; attempt <= 5; attempt++) {
+        try {
+          await axiosClient.get('/health', {
+            timeout: 30000,
+          });
+
+          if (!cancelled) {
+            setBackendReady(true);
+          }
+
+          return;
+        } catch (error) {
+          if (attempt < 5) {
+            await new Promise((resolve) =>
+              setTimeout(resolve, 3000)
+            );
+          }
+        }
+      }
+
+      if (!cancelled) {
+        setBackendReady(false);
+      }
+    };
+
+    wakeBackend();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -25,6 +66,11 @@ export default function Login() {
 
     if (!email || !password) {
       setError('Please enter your email and password.');
+      return;
+    }
+
+    if (!backendReady) {
+      setError('CRM server is still starting. Please wait a moment.');
       return;
     }
 
@@ -149,6 +195,19 @@ export default function Login() {
               disabled={loading}
             />
 
+            {/* Backend status */}
+            <div className="text-center text-xs text-raiz-secondary">
+              {backendReady ? (
+                <span className="text-green-700">
+                  ● CRM ready
+                </span>
+              ) : (
+                <span>
+                  ● Connecting to CRM...
+                </span>
+              )}
+            </div>
+
             {error && (
               <div className="rounded-md border border-red-200 bg-red-50 px-3.5 py-2.5">
                 <p className="text-xs text-red-600">
@@ -162,7 +221,7 @@ export default function Login() {
               className="w-full"
               size="lg"
               loading={loading}
-              disabled={loading}
+              disabled={loading || !backendReady}
             >
               Sign in
             </Button>
