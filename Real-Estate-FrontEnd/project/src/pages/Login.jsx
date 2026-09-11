@@ -17,39 +17,29 @@ export default function Login() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Backend connection status
   const [backendReady, setBackendReady] = useState(false);
 
   const from =
     location.state?.from?.pathname || '/dashboard';
 
-  // Wake Render backend when login page opens
+  // Wake Render in the background.
+  // This does NOT block the login page.
   useEffect(() => {
     let cancelled = false;
 
     const wakeBackend = async () => {
-      for (let attempt = 1; attempt <= 5; attempt++) {
-        try {
-          await axiosClient.get('/health', {
-            timeout: 30000,
-          });
+      try {
+        await axiosClient.get('/health', {
+          timeout: 15000,
+        });
 
-          if (!cancelled) {
-            setBackendReady(true);
-          }
-
-          return;
-        } catch (error) {
-          if (attempt < 5) {
-            await new Promise((resolve) =>
-              setTimeout(resolve, 3000)
-            );
-          }
+        if (!cancelled) {
+          setBackendReady(true);
         }
-      }
-
-      if (!cancelled) {
-        setBackendReady(false);
+      } catch (error) {
+        if (!cancelled) {
+          setBackendReady(false);
+        }
       }
     };
 
@@ -66,11 +56,6 @@ export default function Login() {
 
     if (!email || !password) {
       setError('Please enter your email and password.');
-      return;
-    }
-
-    if (!backendReady) {
-      setError('CRM server is still starting. Please wait a moment.');
       return;
     }
 
@@ -132,6 +117,7 @@ export default function Login() {
           </span>
 
           <div className="h-px flex-1 bg-raiz-border" />
+
         </div>
 
       </div>
@@ -197,6 +183,7 @@ export default function Login() {
 
             {/* Backend status */}
             <div className="text-center text-xs text-raiz-secondary">
+
               {backendReady ? (
                 <span className="text-green-700">
                   ● CRM ready
@@ -206,6 +193,7 @@ export default function Login() {
                   ● Connecting to CRM...
                 </span>
               )}
+
             </div>
 
             {error && (
@@ -221,7 +209,7 @@ export default function Login() {
               className="w-full"
               size="lg"
               loading={loading}
-              disabled={loading || !backendReady}
+              disabled={loading}
             >
               Sign in
             </Button>
