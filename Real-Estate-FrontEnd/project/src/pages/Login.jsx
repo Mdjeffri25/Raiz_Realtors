@@ -22,7 +22,7 @@ export default function Login() {
   // Password visibility
   const [showPassword, setShowPassword] = useState(false);
 
-  // Backend connection status
+  // Backend status
   const [backendReady, setBackendReady] = useState(false);
 
   const from =
@@ -97,48 +97,72 @@ export default function Login() {
     <div className="min-h-screen flex flex-col lg:flex-row bg-white">
 
       {/* ===================================================== */}
-      {/* LEFT — BRAND PANEL */}
+      {/* LEFT — PREMIUM OLIVE BRAND PANEL */}
       {/* ===================================================== */}
 
-      <div className="hidden lg:flex lg:w-2/5 flex-col justify-between p-12 bg-raiz-offwhite border-r border-raiz-border">
+      <div
+        className="hidden lg:flex lg:w-2/5 flex-col justify-between p-12 border-r"
+        style={{
+          backgroundColor: '#59604A',
+          borderColor: '#6B725C',
+        }}
+      >
+
+        {/* Brand */}
 
         <div>
 
-          <div className="font-serif text-3xl font-bold tracking-tight text-raiz-black leading-none">
+          <div className="font-serif text-3xl font-bold tracking-tight text-white leading-none">
             RAIZ
           </div>
 
-          <div className="font-serif text-3xl font-bold tracking-tight text-raiz-black leading-none mt-1">
+          <div className="font-serif text-3xl font-bold tracking-tight text-white leading-none mt-1">
             REALTORS
           </div>
 
-          <div className="mt-3 text-xs font-medium tracking-widest text-raiz-secondary uppercase">
+          <div className="mt-3 text-xs font-medium tracking-widest text-white/70 uppercase">
             Real Estate · Sales · Operations
           </div>
 
         </div>
 
+
+        {/* Brand Statement */}
+
         <div className="max-w-sm">
 
-          <p className="font-serif text-2xl text-raiz-black leading-snug">
+          <p className="font-serif text-2xl text-white leading-snug">
             A refined operations platform for premium real estate teams.
           </p>
 
-          <p className="mt-4 text-sm text-raiz-secondary leading-relaxed">
+          <p className="mt-4 text-sm text-white/70 leading-relaxed">
             Manage leads, track follow-ups, monitor inventory, and close bookings — all from one calm, considered workspace.
           </p>
 
         </div>
 
+
+        {/* Bottom Divider */}
+
         <div className="flex items-center gap-3">
 
-          <div className="h-px flex-1 bg-raiz-border" />
+          <div
+            className="h-px flex-1"
+            style={{
+              backgroundColor: '#7A806B',
+            }}
+          />
 
-          <span className="text-10 tracking-widest text-raiz-secondary/60 uppercase">
+          <span className="text-10 tracking-widest text-white/60 uppercase">
             Operations CRM
           </span>
 
-          <div className="h-px flex-1 bg-raiz-border" />
+          <div
+            className="h-px flex-1"
+            style={{
+              backgroundColor: '#7A806B',
+            }}
+          />
 
         </div>
 
@@ -146,12 +170,13 @@ export default function Login() {
 
 
       {/* ===================================================== */}
-      {/* RIGHT — LOGIN FORM */}
+      {/* RIGHT — WHITE LOGIN AREA */}
       {/* ===================================================== */}
 
-      <div className="flex-1 flex items-center justify-center p-6 sm:p-12">
+      <div className="flex-1 flex items-center justify-center p-6 sm:p-12 bg-white">
 
         <div className="w-full max-w-sm">
+
 
           {/* ================================================= */}
           {/* MOBILE BRAND */}
@@ -188,7 +213,7 @@ export default function Login() {
 
 
           {/* ================================================= */}
-          {/* FORM */}
+          {/* LOGIN FORM */}
           {/* ================================================= */}
 
           <form
@@ -230,6 +255,8 @@ export default function Login() {
                 autoComplete="current-password"
                 disabled={loading}
               />
+
+              {/* Eye button */}
 
               <button
                 type="button"
@@ -282,7 +309,7 @@ export default function Login() {
 
 
             {/* ================================================= */}
-            {/* ERROR */}
+            {/* ERROR MESSAGE */}
             {/* ================================================= */}
 
             {error && (
