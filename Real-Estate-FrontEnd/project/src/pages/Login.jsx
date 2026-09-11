@@ -27,7 +27,10 @@ export default function Login() {
   const from =
     location.state?.from?.pathname || '/dashboard';
 
-  // Wake Render backend when login page opens
+  // ============================================================
+  // WAKE RENDER BACKEND
+  // ============================================================
+
   useEffect(() => {
     let cancelled = false;
 
@@ -54,7 +57,10 @@ export default function Login() {
     };
   }, []);
 
-  // Login
+  // ============================================================
+  // LOGIN
+  // ============================================================
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -98,43 +104,67 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F5F3EF] flex items-center justify-center sm:p-5 lg:p-7">
+    <div
+      className="
+        min-h-screen
+        bg-[#F5F3EF]
+        flex
+        items-center
+        justify-center
+        p-3
+        sm:p-5
+        lg:p-6
+      "
+    >
 
-      {/* MAIN LOGIN CONTAINER */}
+      {/* ========================================================
+          MAIN LOGIN CARD
+      ======================================================== */}
 
       <div
         className="
           relative
           w-full
           max-w-[1420px]
+
           min-h-screen
-          sm:min-h-0
-          sm:h-[820px]
-          lg:h-[820px]
+          lg:h-[calc(100vh-48px)]
+          lg:min-h-[650px]
+          lg:max-h-[820px]
+
           overflow-hidden
+
           bg-[#FAF9F7]
+
           border
           border-[#DDD9D3]
+
+          rounded-none
           sm:rounded-[28px]
+
           flex
           flex-col
           lg:flex-row
+
           shadow-[0_24px_80px_rgba(17,17,17,0.10)]
         "
       >
 
-        {/* =====================================================
-            LEFT BRAND / HOUSE PANEL
-        ===================================================== */}
+        {/* ======================================================
+            LEFT HOUSE PANEL
+        ====================================================== */}
 
         <section
           className="
             relative
             w-full
             lg:w-[50%]
-            min-h-[620px]
+
+            min-h-[560px]
             lg:min-h-0
+
             overflow-hidden
+
             bg-[#111111]
             text-white
           "
@@ -155,7 +185,7 @@ export default function Login() {
             "
           />
 
-          {/* DARK / OLIVE OVERLAY */}
+          {/* DARK OLIVE / NAVY OVERLAY */}
 
           <div
             className="
@@ -168,7 +198,7 @@ export default function Login() {
             "
           />
 
-          {/* OLIVE SIDE LINE */}
+          {/* OLIVE EDGE */}
 
           <div
             className="
@@ -187,33 +217,51 @@ export default function Login() {
             className="
               relative
               z-10
+
               h-full
-              min-h-[620px]
+
+              min-h-[560px]
               lg:min-h-0
-              px-8
-              py-9
+
+              px-7
+              py-8
+
               sm:px-10
-              sm:py-11
-              lg:px-12
-              lg:py-12
+              sm:py-10
+
+              lg:px-10
+              lg:py-10
+
+              xl:px-12
+              xl:py-11
+
               flex
               flex-col
               justify-between
             "
           >
 
-            {/* TOP BRAND */}
+            {/* ==================================================
+                LEFT BRAND
+            ================================================== */}
 
             <div>
 
-              <div className="flex items-center gap-4">
+              <div
+                className="
+                  flex
+                  items-center
+                  gap-4
+                "
+              >
 
                 <h1
                   className="
                     font-serif
-                    text-[30px]
-                    sm:text-[34px]
-                    lg:text-[38px]
+                    text-[28px]
+                    sm:text-[32px]
+                    lg:text-[34px]
+                    xl:text-[38px]
                     leading-none
                     tracking-tight
                     text-white
@@ -235,12 +283,17 @@ export default function Login() {
               <div
                 className="
                   mt-1
+
                   font-serif
-                  text-[30px]
-                  sm:text-[34px]
-                  lg:text-[38px]
+
+                  text-[28px]
+                  sm:text-[32px]
+                  lg:text-[34px]
+                  xl:text-[38px]
+
                   leading-none
                   tracking-tight
+
                   text-white
                 "
               >
@@ -249,11 +302,15 @@ export default function Login() {
 
               <div
                 className="
-                  mt-5
-                  text-[9px]
-                  sm:text-[10px]
-                  tracking-[0.30em]
+                  mt-4
+
+                  text-[8px]
+                  sm:text-[9px]
+
+                  tracking-[0.28em]
+
                   text-white/75
+
                   uppercase
                 "
               >
@@ -263,26 +320,33 @@ export default function Login() {
             </div>
 
 
-            {/* CENTER BRAND MESSAGE */}
+            {/* ==================================================
+                LEFT MAIN MESSAGE
+            ================================================== */}
 
             <div
               className="
-                max-w-[520px]
-                -mt-4
-                lg:-mt-8
+                max-w-[500px]
+                -mt-3
+                lg:-mt-4
               "
             >
 
               <div
                 className="
-                  mb-6
+                  mb-5
+
                   flex
                   items-center
                   gap-4
-                  text-[9px]
-                  sm:text-[10px]
-                  tracking-[0.30em]
+
+                  text-[8px]
+                  sm:text-[9px]
+
+                  tracking-[0.28em]
+
                   uppercase
+
                   text-white/65
                 "
               >
@@ -290,7 +354,7 @@ export default function Login() {
                 <div
                   className="
                     h-px
-                    w-10
+                    w-9
                     bg-[#A8AD92]
                   "
                 />
@@ -305,12 +369,18 @@ export default function Login() {
               <h2
                 className="
                   font-serif
-                  text-[32px]
-                  sm:text-[38px]
-                  lg:text-[46px]
+
+                  text-[29px]
+                  sm:text-[34px]
+                  lg:text-[38px]
+                  xl:text-[44px]
+
                   leading-[1.08]
+
                   font-normal
+
                   tracking-tight
+
                   text-white
                 "
               >
@@ -322,7 +392,11 @@ export default function Login() {
 
                 for{' '}
 
-                <span className="text-[#B3B997]">
+                <span
+                  className="
+                    text-[#B3B997]
+                  "
+                >
                   premium
                 </span>
 
@@ -334,12 +408,17 @@ export default function Login() {
 
               <p
                 className="
-                  mt-6
-                  max-w-[470px]
-                  text-[13px]
-                  sm:text-[14px]
-                  lg:text-[15px]
-                  leading-7
+                  mt-5
+
+                  max-w-[440px]
+
+                  text-[12px]
+                  sm:text-[13px]
+                  lg:text-[13px]
+                  xl:text-[14px]
+
+                  leading-6
+
                   text-white/75
                 "
               >
@@ -351,9 +430,9 @@ export default function Login() {
             </div>
 
 
-            {/* =================================================
-                BOTTOM ICON NAVIGATION
-            ================================================= */}
+            {/* ==================================================
+                LEFT BOTTOM ICONS
+            ================================================== */}
 
             <div>
 
@@ -371,17 +450,19 @@ export default function Login() {
                 <div
                   className="
                     flex-1
+
                     flex
                     flex-col
                     items-center
                     justify-center
+
                     text-center
                   "
                 >
 
                   <svg
-                    width="30"
-                    height="30"
+                    width="27"
+                    height="27"
                     viewBox="0 0 30 30"
                     fill="none"
                     xmlns="http://www.w3.org/2000/svg"
@@ -397,9 +478,9 @@ export default function Login() {
 
                   <span
                     className="
-                      mt-3
-                      text-[9px]
-                      tracking-[0.25em]
+                      mt-2.5
+                      text-[8px]
+                      tracking-[0.22em]
                       uppercase
                       text-white/80
                     "
@@ -412,7 +493,12 @@ export default function Login() {
 
                 {/* DIVIDER */}
 
-                <div className="w-px bg-white/25" />
+                <div
+                  className="
+                    w-px
+                    bg-white/25
+                  "
+                />
 
 
                 {/* PROGRESS */}
@@ -420,17 +506,19 @@ export default function Login() {
                 <div
                   className="
                     flex-1
+
                     flex
                     flex-col
                     items-center
                     justify-center
+
                     text-center
                   "
                 >
 
                   <svg
-                    width="30"
-                    height="30"
+                    width="27"
+                    height="27"
                     viewBox="0 0 30 30"
                     fill="none"
                     xmlns="http://www.w3.org/2000/svg"
@@ -468,9 +556,9 @@ export default function Login() {
 
                   <span
                     className="
-                      mt-3
-                      text-[9px]
-                      tracking-[0.25em]
+                      mt-2.5
+                      text-[8px]
+                      tracking-[0.22em]
                       uppercase
                       text-white/80
                     "
@@ -483,7 +571,12 @@ export default function Login() {
 
                 {/* DIVIDER */}
 
-                <div className="w-px bg-white/25" />
+                <div
+                  className="
+                    w-px
+                    bg-white/25
+                  "
+                />
 
 
                 {/* OPERATIONS CRM */}
@@ -491,17 +584,19 @@ export default function Login() {
                 <div
                   className="
                     flex-1
+
                     flex
                     flex-col
                     items-center
                     justify-center
+
                     text-center
                   "
                 >
 
                   <svg
-                    width="30"
-                    height="30"
+                    width="27"
+                    height="27"
                     viewBox="0 0 30 30"
                     fill="none"
                     xmlns="http://www.w3.org/2000/svg"
@@ -533,11 +628,16 @@ export default function Login() {
 
                   <span
                     className="
-                      mt-3
-                      text-[9px]
-                      tracking-[0.20em]
+                      mt-2.5
+
+                      text-[8px]
+
+                      tracking-[0.18em]
+
                       uppercase
+
                       text-white/80
+
                       whitespace-nowrap
                     "
                   >
@@ -553,20 +653,26 @@ export default function Login() {
 
               <div
                 className="
-                  mt-7
+                  mt-5
+
                   flex
                   items-center
                   gap-4
+
                   max-w-[500px]
                 "
               >
 
                 <span
                   className="
-                    text-[8px]
-                    tracking-[0.30em]
+                    text-[7px]
+
+                    tracking-[0.28em]
+
                     uppercase
+
                     text-[#B3B997]/75
+
                     whitespace-nowrap
                   "
                 >
@@ -590,38 +696,55 @@ export default function Login() {
         </section>
 
 
-        {/* =====================================================
+        {/* ======================================================
             RIGHT LOGIN PANEL
-        ===================================================== */}
+        ====================================================== */}
 
         <section
           className="
             relative
+
             flex-1
+
             bg-[#FAF9F7]
+
             flex
-            items-center
+            items-start
             justify-center
+
+            overflow-y-auto
+
             px-7
-            py-12
-            sm:px-12
-            lg:px-16
-            xl:px-20
+            py-8
+
+            sm:px-10
+            sm:py-9
+
+            lg:px-12
+            lg:py-8
+
+            xl:px-16
           "
         >
 
-          {/* TOP RIGHT TEXT */}
+          {/* TOP RIGHT */}
 
           <div
             className="
               absolute
-              top-8
-              right-10
+
+              top-7
+              right-8
+
               hidden
               md:block
-              text-[8px]
-              tracking-[0.35em]
+
+              text-[7px]
+
+              tracking-[0.32em]
+
               text-[#77736E]
+
               uppercase
             "
           >
@@ -629,38 +752,103 @@ export default function Login() {
           </div>
 
 
-          {/* LOGIN CONTENT */}
+          {/* ==================================================
+              RIGHT CONTENT
+          ================================================== */}
 
           <div
             className="
               w-full
-              max-w-[430px]
+              max-w-[420px]
             "
           >
 
-            {/* TITLE */}
+            {/* ==================================================
+                BRAND ABOVE SIGN IN
+            ================================================== */}
 
-            <div className="mb-9">
+            <div
+              className="
+                mb-7
+                pb-5
+
+                border-b
+                border-[#DDD9D3]
+              "
+            >
+
+              <div
+                className="
+                  font-serif
+
+                  text-base
+                  sm:text-lg
+
+                  text-[#111111]
+                "
+              >
+                RAIZ REALTORS
+              </div>
+
+
+              <div
+                className="
+                  mt-1.5
+
+                  text-[7px]
+                  sm:text-[8px]
+
+                  tracking-[0.28em]
+
+                  text-[#77736E]
+
+                  uppercase
+                "
+              >
+                REAL ESTATE · SALES · OPERATIONS
+              </div>
+
+            </div>
+
+
+            {/* ==================================================
+                SIGN IN TITLE
+            ================================================== */}
+
+            <div
+              className="
+                mb-7
+              "
+            >
 
               <h2
                 className="
                   font-serif
-                  text-[36px]
-                  sm:text-[42px]
-                  lg:text-[46px]
+
+                  text-[34px]
+                  sm:text-[38px]
+                  lg:text-[42px]
+
                   font-normal
+
                   leading-none
+
                   tracking-tight
+
                   text-[#111111]
                 "
               >
                 Sign in
               </h2>
 
+
               <p
                 className="
-                  mt-4
-                  text-sm
+                  mt-3
+
+                  text-[13px]
+                  sm:text-sm
+
                   text-[#77736E]
                 "
               >
@@ -670,11 +858,15 @@ export default function Login() {
             </div>
 
 
-            {/* FORM */}
+            {/* ==================================================
+                LOGIN FORM
+            ================================================== */}
 
             <form
               onSubmit={handleSubmit}
-              className="space-y-6"
+              className="
+                space-y-5
+              "
             >
 
               {/* EMAIL */}
@@ -685,31 +877,47 @@ export default function Login() {
                   htmlFor="email"
                   className="
                     block
+
                     mb-2
-                    text-[10px]
+
+                    text-[9px]
+
                     font-medium
+
                     tracking-[0.22em]
+
                     uppercase
+
                     text-[#55514D]
                   "
                 >
                   Email
                 </label>
 
+
                 <div
                   className="
-                    h-[50px]
+                    h-[48px]
+
                     flex
                     items-center
+
                     border
                     border-[#D4DCE3]
-                    rounded-[9px]
+
+                    rounded-[8px]
+
                     bg-[#E8EEF3]
+
                     px-4
+
                     transition-all
                     duration-200
+
                     focus-within:border-[#59614A]
+
                     focus-within:ring-2
+
                     focus-within:ring-[#59614A]/10
                   "
                 >
@@ -717,12 +925,16 @@ export default function Login() {
                   {/* EMAIL ICON */}
 
                   <svg
-                    width="20"
-                    height="20"
+                    width="19"
+                    height="19"
                     viewBox="0 0 24 24"
                     fill="none"
                     xmlns="http://www.w3.org/2000/svg"
-                    className="mr-3 shrink-0 text-[#59636B]"
+                    className="
+                      mr-3
+                      shrink-0
+                      text-[#59636B]
+                    "
                   >
 
                     <rect
@@ -757,11 +969,17 @@ export default function Login() {
                     disabled={loading}
                     className="
                       w-full
+
                       bg-transparent
+
                       outline-none
+
                       border-none
+
                       text-sm
+
                       text-[#111111]
+
                       placeholder:text-[#899198]
                     "
                   />
@@ -779,31 +997,47 @@ export default function Login() {
                   htmlFor="password"
                   className="
                     block
+
                     mb-2
-                    text-[10px]
+
+                    text-[9px]
+
                     font-medium
+
                     tracking-[0.22em]
+
                     uppercase
+
                     text-[#55514D]
                   "
                 >
                   Password
                 </label>
 
+
                 <div
                   className="
-                    h-[50px]
+                    h-[48px]
+
                     flex
                     items-center
+
                     border
                     border-[#D4DCE3]
-                    rounded-[9px]
+
+                    rounded-[8px]
+
                     bg-[#E8EEF3]
+
                     px-4
+
                     transition-all
                     duration-200
+
                     focus-within:border-[#59614A]
+
                     focus-within:ring-2
+
                     focus-within:ring-[#59614A]/10
                   "
                 >
@@ -811,12 +1045,16 @@ export default function Login() {
                   {/* LOCK ICON */}
 
                   <svg
-                    width="20"
-                    height="20"
+                    width="19"
+                    height="19"
                     viewBox="0 0 24 24"
                     fill="none"
                     xmlns="http://www.w3.org/2000/svg"
-                    className="mr-3 shrink-0 text-[#59636B]"
+                    className="
+                      mr-3
+                      shrink-0
+                      text-[#59636B]
+                    "
                   >
 
                     <rect
@@ -838,8 +1076,6 @@ export default function Login() {
                   </svg>
 
 
-                  {/* PASSWORD INPUT */}
-
                   <input
                     id="password"
                     type={
@@ -856,11 +1092,17 @@ export default function Login() {
                     disabled={loading}
                     className="
                       w-full
+
                       bg-transparent
+
                       outline-none
+
                       border-none
+
                       text-sm
+
                       text-[#111111]
+
                       placeholder:text-[#899198]
                     "
                   />
@@ -871,15 +1113,22 @@ export default function Login() {
                   <button
                     type="button"
                     onClick={() =>
-                      setShowPassword(!showPassword)
+                      setShowPassword(
+                        !showPassword
+                      )
                     }
                     disabled={loading}
                     className="
                       ml-3
+
                       shrink-0
+
                       text-[#667078]
+
                       hover:text-[#59614A]
+
                       transition-colors
+
                       disabled:opacity-50
                     "
                     aria-label={
@@ -891,11 +1140,9 @@ export default function Login() {
 
                     {showPassword ? (
 
-                      /* OPEN EYE */
-
                       <svg
-                        width="20"
-                        height="20"
+                        width="19"
+                        height="19"
                         viewBox="0 0 24 24"
                         fill="none"
                         xmlns="http://www.w3.org/2000/svg"
@@ -919,11 +1166,9 @@ export default function Login() {
 
                     ) : (
 
-                      /* CLOSED EYE */
-
                       <svg
-                        width="20"
-                        height="20"
+                        width="19"
+                        height="19"
                         viewBox="0 0 24 24"
                         fill="none"
                         xmlns="http://www.w3.org/2000/svg"
@@ -959,13 +1204,14 @@ export default function Login() {
               </div>
 
 
-              {/* REMEMBER ME / FORGOT PASSWORD */}
+              {/* REMEMBER / FORGOT */}
 
               <div
                 className="
                   flex
                   items-center
                   justify-between
+
                   text-xs
                 "
               >
@@ -975,7 +1221,9 @@ export default function Login() {
                     flex
                     items-center
                     gap-2
+
                     text-[#4F4B47]
+
                     cursor-pointer
                   "
                 >
@@ -1000,7 +1248,9 @@ export default function Login() {
                   type="button"
                   className="
                     text-[#59614A]
+
                     hover:text-[#3F4735]
+
                     transition-colors
                   "
                 >
@@ -1010,13 +1260,14 @@ export default function Login() {
               </div>
 
 
-              {/* BACKEND STATUS */}
+              {/* CRM STATUS */}
 
               <div
                 className="
                   flex
                   justify-center
                   items-center
+
                   text-xs
                 "
               >
@@ -1028,6 +1279,7 @@ export default function Login() {
                       flex
                       items-center
                       gap-2
+
                       text-[#59614A]
                     "
                   >
@@ -1052,6 +1304,7 @@ export default function Login() {
                       flex
                       items-center
                       gap-2
+
                       text-[#77736E]
                     "
                   >
@@ -1081,9 +1334,12 @@ export default function Login() {
                 <div
                   className="
                     rounded-lg
+
                     border
                     border-red-200
+
                     bg-red-50
+
                     px-4
                     py-3
                   "
@@ -1111,22 +1367,36 @@ export default function Login() {
                 disabled={loading}
                 className="
                   w-full
-                  h-[56px]
-                  rounded-[9px]
+
+                  h-[54px]
+
+                  rounded-[8px]
+
                   bg-[#111111]
+
                   text-white
+
                   text-sm
+
                   font-medium
+
                   tracking-wide
+
                   flex
                   items-center
                   justify-center
+
                   gap-3
+
                   transition-all
                   duration-200
+
                   hover:bg-[#3F4735]
+
                   active:scale-[0.995]
+
                   disabled:opacity-60
+
                   disabled:cursor-not-allowed
                 "
               >
@@ -1138,8 +1408,8 @@ export default function Login() {
                 {!loading && (
 
                   <svg
-                    width="19"
-                    height="19"
+                    width="18"
+                    height="18"
                     viewBox="0 0 24 24"
                     fill="none"
                     xmlns="http://www.w3.org/2000/svg"
@@ -1169,55 +1439,28 @@ export default function Login() {
             </form>
 
 
-            {/* =================================================
-                FOOTER BRAND
-            ================================================= */}
+            {/* ==================================================
+                RESTRICTED ACCESS
+            ================================================== */}
 
             <div
               className="
-                mt-10
-                pt-6
+                mt-8
+
+                pt-5
+
                 border-t
                 border-[#DDD9D3]
               "
             >
 
-              {/* BRAND ONLY — COLOR DOTS REMOVED */}
-
-              <div>
-
-                <div
-                  className="
-                    font-serif
-                    text-lg
-                    text-[#111111]
-                  "
-                >
-                  RAIZ REALTORS
-                </div>
-
-                <div
-                  className="
-                    mt-1.5
-                    text-[8px]
-                    tracking-[0.28em]
-                    text-[#77736E]
-                    uppercase
-                  "
-                >
-                  REAL ESTATE · SALES · OPERATIONS
-                </div>
-
-              </div>
-
-
-              {/* RESTRICTED ACCESS */}
-
               <p
                 className="
-                  mt-6
                   text-center
-                  text-[10px]
+
+                  text-[9px]
+                  sm:text-[10px]
+
                   text-[#77736E]
                 "
               >
