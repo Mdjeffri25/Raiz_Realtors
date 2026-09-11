@@ -6,7 +6,7 @@ import Topbar from './Topbar';
 const PAGE_META = {
   '/dashboard': {
     title: 'Dashboard',
-    description: 'Sales overview & today\'s activity',
+    description: "Sales overview & today's activity",
   },
   '/leads': {
     title: 'Leads',
@@ -48,24 +48,31 @@ export default function Layout() {
   };
 
   return (
-    <div className="flex min-h-screen bg-raiz-offwhite">
+    <div className="flex min-h-screen bg-raiz-offwhite text-raiz-black">
+
+      {/* Sidebar */}
       <Sidebar
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
       />
 
-      <div className="flex-1 min-w-0 flex flex-col">
+      {/* Main application */}
+      <div className="flex min-w-0 flex-1 flex-col">
+
+        {/* Top navigation */}
         <Topbar
           title={meta.title}
           description={meta.description}
           onMenuClick={() => setSidebarOpen(true)}
         />
 
-        <main className="flex-1 overflow-x-hidden">
-          <div className="w-full px-4 py-6 sm:px-6 lg:px-8 xl:px-10">
+        {/* Page content */}
+        <main className="min-w-0 flex-1 overflow-x-hidden">
+          <div className="mx-auto w-full max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
             <Outlet />
           </div>
         </main>
+
       </div>
     </div>
   );
