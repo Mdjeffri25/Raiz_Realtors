@@ -14,12 +14,47 @@ import PageHeader from '../components/ui/PageHeader';
 import { LoadingState, ErrorState, EmptyState } from '../components/ui/States';
 import { Plus, Search, Phone, Mail, Calendar, User as UserIcon, Trash2, Edit3, X } from 'lucide-react';
 
+const LEADS_CACHE_PREFIX = 'raiz_leads_cache_';
+const LEADS_CACHE_TIME = 5 * 60 * 1000;
+
+function getLeadsCacheKey(search, stageFilter, assignedFilter, followUpFilter) {
+  return `${LEADS_CACHE_PREFIX}${encodeURIComponent(search || '')}_${encodeURIComponent(stageFilter || '')}_${encodeURIComponent(assignedFilter || '')}_${encodeURIComponent(followUpFilter || '')}`;
+}
+
+function readLeadsCache(key) {
+  try {
+    const cached = sessionStorage.getItem(key);
+    if (!cached) return null;
+
+    const parsed = JSON.parse(cached);
+    if (parsed?.timestamp && Date.now() - parsed.timestamp < LEADS_CACHE_TIME) {
+      return Array.isArray(parsed.data) ? parsed.data : [];
+    }
+
+    sessionStorage.removeItem(key);
+  } catch {
+    sessionStorage.removeItem(key);
+  }
+
+  return null;
+}
+
+function clearLeadsCache() {
+  try {
+    Object.keys(sessionStorage)
+      .filter((key) => key.startsWith(LEADS_CACHE_PREFIX))
+      .forEach((key) => sessionStorage.removeItem(key));
+  } catch {
+    // Ignore storage errors.
+  }
+}
+
 export default function Leads() {
   const { user, hasRole } = useAuth();
   const { showSuccess, showError } = useToast();
 
   const [leads, setLeads] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   const [search, setSearch] = useState('');
@@ -68,18 +103,49 @@ export default function Leads() {
   }
 
   const fetchLeads = useCallback(async () => {
-    setLoading(true);
+    const cacheKey = getLeadsCacheKey(
+      search,
+      stageFilter,
+      assignedFilter,
+      followUpFilter
+    );
+
+    const cachedLeads = readLeadsCache(cacheKey);
+
+    if (cachedLeads !== null) {
+      setLeads(cachedLeads);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
+
     setError(null);
+
     try {
       const params = {};
       if (search) params.search = search;
       if (stageFilter) params.stage = stageFilter;
       if (assignedFilter) params.assignedUser = assignedFilter;
       if (followUpFilter) params.followUpDate = followUpFilter;
+
       const res = await leadApi.getAll(params);
-      setLeads(Array.isArray(res.data) ? res.data : []);
+      const freshLeads = Array.isArray(res.data) ? res.data : [];
+
+      setLeads(freshLeads);
+
+      sessionStorage.setItem(
+        cacheKey,
+        JSON.stringify({
+          data: freshLeads,
+          timestamp: Date.now(),
+        })
+      );
     } catch (err) {
-      setError(err.message || 'Unable to load leads.');
+      // Keep cached data visible if the background refresh fails.
+      if (cachedLeads === null) {
+        setError(err.message || 'Unable to load leads.');
+      }
+
       if (err.status !== 0) showError(err.message);
     } finally {
       setLoading(false);
@@ -113,6 +179,7 @@ export default function Leads() {
       setLeads((prev) => prev.map((l) => (l.id === updated.id ? updated : l)));
       setSelectedLead(updated);
       setEditMode(false);
+      clearLeadsCache();
       showSuccess('Lead updated successfully.');
     } catch (err) {
       showError(err.message || 'Failed to update lead.');
@@ -133,6 +200,7 @@ export default function Leads() {
       setLeads((prev) => [created, ...prev]);
       setCreateOpen(false);
       setCreateForm(emptyLead());
+      clearLeadsCache();
       showSuccess('Lead created successfully.');
     } catch (err) {
       showError(err.message || 'Failed to create lead.');
@@ -149,6 +217,7 @@ export default function Leads() {
       setLeads((prev) => prev.filter((l) => l.id !== deleteTarget.id));
       setDeleteTarget(null);
       setDrawerOpen(false);
+      clearLeadsCache();
       showSuccess('Lead deleted.');
     } catch (err) {
       showError(err.message || 'Failed to delete lead.');

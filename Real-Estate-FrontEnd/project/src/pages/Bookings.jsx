@@ -14,6 +14,41 @@ import PageHeader from '../components/ui/PageHeader';
 import { LoadingState, ErrorState, EmptyState } from '../components/ui/States';
 import { Plus, Search, Check, ChevronRight, ChevronLeft, X, ClipboardList, Building2, User as UserIcon, IndianRupee } from 'lucide-react';
 
+
+const BOOKINGS_CACHE_KEY = 'raiz_bookings_cache';
+const BOOKING_LEADS_CACHE_KEY = 'raiz_booking_leads_cache';
+const BOOKING_UNITS_CACHE_KEY = 'raiz_booking_units_cache';
+const BOOKINGS_CACHE_TIME = 5 * 60 * 1000;
+
+function readSimpleCache(key) {
+  try {
+    const cached = sessionStorage.getItem(key);
+    if (!cached) return null;
+
+    const parsed = JSON.parse(cached);
+    if (parsed?.timestamp && Date.now() - parsed.timestamp < BOOKINGS_CACHE_TIME) {
+      return parsed.data ?? null;
+    }
+
+    sessionStorage.removeItem(key);
+  } catch {
+    sessionStorage.removeItem(key);
+  }
+
+  return null;
+}
+
+function writeSimpleCache(key, data) {
+  try {
+    sessionStorage.setItem(
+      key,
+      JSON.stringify({ data, timestamp: Date.now() })
+    );
+  } catch {
+    // Ignore storage errors.
+  }
+}
+
 export default function Bookings() {
   const { user, hasRole } = useAuth();
   const { showSuccess, showError } = useToast();
@@ -22,7 +57,7 @@ export default function Bookings() {
   const isAuditor = user?.role === ROLES.AUDITOR;
 
   const [bookings, setBookings] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
 
@@ -39,13 +74,28 @@ export default function Bookings() {
   const [confirmedBooking, setConfirmedBooking] = useState(null);
 
   const fetchBookings = useCallback(async () => {
-    setLoading(true);
+    const cachedBookings = readSimpleCache(BOOKINGS_CACHE_KEY);
+
+    if (cachedBookings !== null) {
+      setBookings(Array.isArray(cachedBookings) ? cachedBookings : []);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
+
     setError(null);
+
     try {
       const res = await bookingApi.getAll();
-      setBookings(Array.isArray(res.data) ? res.data : []);
+      const freshBookings = Array.isArray(res.data) ? res.data : [];
+
+      setBookings(freshBookings);
+      writeSimpleCache(BOOKINGS_CACHE_KEY, freshBookings);
     } catch (err) {
-      setError(err.message || 'Unable to load bookings.');
+      if (cachedBookings === null) {
+        setError(err.message || 'Unable to load bookings.');
+      }
+
       if (err.status !== 0) showError(err.message);
     } finally {
       setLoading(false);
@@ -71,20 +121,47 @@ export default function Bookings() {
     setWizardOpen(true);
     setStep(1);
     setSelectedLead(null);
-    setWizardLoading(true);
+
+    const cachedLeads = readSimpleCache(BOOKING_LEADS_CACHE_KEY);
+    const cachedUnits = readSimpleCache(BOOKING_UNITS_CACHE_KEY);
+    const hasCachedWizardData = cachedLeads !== null || cachedUnits !== null;
+
+    if (cachedLeads !== null) {
+      setLeads(Array.isArray(cachedLeads) ? cachedLeads : []);
+    }
+
+    if (cachedUnits !== null) {
+      setUnits(
+        (Array.isArray(cachedUnits) ? cachedUnits : []).filter(
+          (u) => (u.status || '').toUpperCase() === 'AVAILABLE'
+        )
+      );
+    }
+
+    setWizardLoading(!hasCachedWizardData);
+
     try {
       const [leadRes, unitRes] = await Promise.all([
         leadApi.getAll(),
         propertyApi.getUnits(),
       ]);
-      setLeads(Array.isArray(leadRes.data) ? leadRes.data : []);
+
+      const freshLeads = Array.isArray(leadRes.data) ? leadRes.data : [];
+      const freshUnits = Array.isArray(unitRes.data) ? unitRes.data : [];
+
+      setLeads(freshLeads);
       setUnits(
-        (Array.isArray(unitRes.data) ? unitRes.data : []).filter(
+        freshUnits.filter(
           (u) => (u.status || '').toUpperCase() === 'AVAILABLE'
         )
       );
+
+      writeSimpleCache(BOOKING_LEADS_CACHE_KEY, freshLeads);
+      writeSimpleCache(BOOKING_UNITS_CACHE_KEY, freshUnits);
     } catch (err) {
-      showError(err.message || 'Unable to load data for booking.');
+      if (!hasCachedWizardData) {
+        showError(err.message || 'Unable to load data for booking.');
+      }
     } finally {
       setWizardLoading(false);
     }
@@ -111,6 +188,7 @@ export default function Bookings() {
       const res = await bookingApi.create(payload);
       setConfirmedBooking(res.data);
       showSuccess('Booking confirmed successfully.');
+      sessionStorage.removeItem(BOOKING_UNITS_CACHE_KEY);
       fetchBookings();
     } catch (err) {
       if (err.status === 409) {

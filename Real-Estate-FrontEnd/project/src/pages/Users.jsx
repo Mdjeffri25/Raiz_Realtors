@@ -9,13 +9,61 @@ import { ROLE_OPTIONS } from '../utils/constants';
 import userApi from '../api/userApi';
 import { Search, Plus, Shield, Trash2 } from 'lucide-react';
 
+const USERS_CACHE_KEY = 'raiz_users_cache';
+const USERS_CACHE_TIME = 5 * 60 * 1000; // 5 minutes
+
 export default function Users() {
   const { showError, showSuccess } = useToast();
 
   const [search, setSearch] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
-  const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
+
+  // Load cached users immediately
+  const [users, setUsers] = useState(() => {
+    try {
+      const cached = sessionStorage.getItem(USERS_CACHE_KEY);
+
+      if (!cached) {
+        return [];
+      }
+
+      const parsed = JSON.parse(cached);
+
+      if (
+        parsed?.timestamp &&
+        Date.now() - parsed.timestamp < USERS_CACHE_TIME
+      ) {
+        return Array.isArray(parsed.data) ? parsed.data : [];
+      }
+
+      sessionStorage.removeItem(USERS_CACHE_KEY);
+      return [];
+    } catch {
+      sessionStorage.removeItem(USERS_CACHE_KEY);
+      return [];
+    }
+  });
+
+  // Only show loading when no valid cache exists
+  const [loading, setLoading] = useState(() => {
+    try {
+      const cached = sessionStorage.getItem(USERS_CACHE_KEY);
+
+      if (!cached) {
+        return true;
+      }
+
+      const parsed = JSON.parse(cached);
+
+      return !(
+        parsed?.timestamp &&
+        Date.now() - parsed.timestamp < USERS_CACHE_TIME
+      );
+    } catch {
+      return true;
+    }
+  });
+
   const [creating, setCreating] = useState(false);
 
   const [createForm, setCreateForm] = useState({
@@ -25,20 +73,43 @@ export default function Users() {
     password: '',
   });
 
+  // ==========================================
   // LOAD USERS
-  const loadUsers = async () => {
-    try {
-      setLoading(true);
+  // ==========================================
 
+  const loadUsers = async () => {
+    // If we already have cached users, don't replace
+    // the page with a loading screen.
+    if (users.length === 0) {
+      setLoading(true);
+    }
+
+    try {
       const response = await userApi.getAll();
 
-      setUsers(response.data || []);
+      const freshUsers = Array.isArray(response.data)
+        ? response.data
+        : [];
+
+      setUsers(freshUsers);
+
+      // Save fresh users to cache
+      sessionStorage.setItem(
+        USERS_CACHE_KEY,
+        JSON.stringify({
+          data: freshUsers,
+          timestamp: Date.now(),
+        })
+      );
     } catch (error) {
       console.error('Failed to load users:', error);
-      showError(
-        error.message ||
-        'Failed to load users.'
-      );
+
+      // Keep cached users visible if API fails
+      if (users.length === 0) {
+        showError(
+          error.message || 'Failed to load users.'
+        );
+      }
     } finally {
       setLoading(false);
     }
@@ -48,7 +119,10 @@ export default function Users() {
     loadUsers();
   }, []);
 
+  // ==========================================
   // SEARCH
+  // ==========================================
+
   const filteredUsers = users.filter((u) => {
     if (!search) return true;
 
@@ -59,26 +133,51 @@ export default function Users() {
       .includes(q);
   });
 
+  // ==========================================
   // CREATE USER
+  // ==========================================
+
   const handleCreate = async () => {
     if (
       !createForm.name.trim() ||
       !createForm.email.trim() ||
       !createForm.password.trim()
     ) {
-      showError('Name, email and password are required.');
+      showError(
+        'Name, email and password are required.'
+      );
       return;
     }
 
     try {
       setCreating(true);
 
-      await userApi.create({
+      const response = await userApi.create({
         name: createForm.name.trim(),
         email: createForm.email.trim(),
         password: createForm.password,
         role: createForm.role,
       });
+
+      // Immediately update visible users
+      if (response.data) {
+        const updatedUsers = [
+          ...users,
+          response.data,
+        ];
+
+        setUsers(updatedUsers);
+
+        sessionStorage.setItem(
+          USERS_CACHE_KEY,
+          JSON.stringify({
+            data: updatedUsers,
+            timestamp: Date.now(),
+          })
+        );
+      } else {
+        await loadUsers();
+      }
 
       showSuccess('User created successfully.');
 
@@ -90,21 +189,22 @@ export default function Users() {
         role: 'SALES',
         password: '',
       });
-
-      await loadUsers();
     } catch (error) {
       console.error('Failed to create user:', error);
 
       showError(
-        error.message||
-        'Failed to create user.'
+        error.message ||
+          'Failed to create user.'
       );
     } finally {
       setCreating(false);
     }
   };
 
+  // ==========================================
   // DELETE USER
+  // ==========================================
+
   const handleDelete = async (id, name) => {
     const confirmed = window.confirm(
       `Delete user "${name}"?`
@@ -115,15 +215,29 @@ export default function Users() {
     try {
       await userApi.remove(id);
 
-      showSuccess('User deleted successfully.');
+      // Immediately remove from visible list
+      const updatedUsers = users.filter(
+        (u) => u.id !== id
+      );
 
-      await loadUsers();
+      setUsers(updatedUsers);
+
+      // Update cache immediately
+      sessionStorage.setItem(
+        USERS_CACHE_KEY,
+        JSON.stringify({
+          data: updatedUsers,
+          timestamp: Date.now(),
+        })
+      );
+
+      showSuccess('User deleted successfully.');
     } catch (error) {
       console.error('Failed to delete user:', error);
 
       showError(
         error.message ||
-        'Failed to delete user.'
+          'Failed to delete user.'
       );
     }
   };
@@ -134,7 +248,9 @@ export default function Users() {
         title="Users"
         description="Manage team members & access levels."
       >
-        <Button onClick={() => setCreateOpen(true)}>
+        <Button
+          onClick={() => setCreateOpen(true)}
+        >
           <Plus size={15} />
           Add User
         </Button>
@@ -145,7 +261,9 @@ export default function Users() {
         <Input
           placeholder="Search users…"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) =>
+            setSearch(e.target.value)
+          }
           icon={<Search size={14} />}
         />
       </div>
@@ -167,7 +285,11 @@ export default function Users() {
             }
             action={
               !search && (
-                <Button onClick={() => setCreateOpen(true)}>
+                <Button
+                  onClick={() =>
+                    setCreateOpen(true)
+                  }
+                >
                   <Plus size={15} />
                   Add User
                 </Button>
@@ -176,6 +298,7 @@ export default function Users() {
           />
         ) : (
           <div className="overflow-x-auto scrollbar-thin">
+
             <table className="w-full text-sm">
 
               <thead>
@@ -257,7 +380,9 @@ export default function Users() {
                           }`}
                         />
 
-                        {u.active ? 'Active' : 'Inactive'}
+                        {u.active
+                          ? 'Active'
+                          : 'Inactive'}
 
                       </span>
 
@@ -267,7 +392,10 @@ export default function Users() {
 
                       <button
                         onClick={() =>
-                          handleDelete(u.id, u.name)
+                          handleDelete(
+                            u.id,
+                            u.name
+                          )
                         }
                         className="inline-flex items-center justify-center p-2 text-raiz-secondary hover:text-red-600 transition-colors"
                         title="Delete user"
@@ -283,6 +411,7 @@ export default function Users() {
               </tbody>
 
             </table>
+
           </div>
         )}
 
@@ -291,7 +420,9 @@ export default function Users() {
       {/* CREATE USER MODAL */}
       <Modal
         open={createOpen}
-        onClose={() => setCreateOpen(false)}
+        onClose={() =>
+          setCreateOpen(false)
+        }
         title="Add New User"
         width="max-w-md"
         footer={
@@ -299,7 +430,9 @@ export default function Users() {
             <Button
               variant="secondary"
               size="sm"
-              onClick={() => setCreateOpen(false)}
+              onClick={() =>
+                setCreateOpen(false)
+              }
             >
               Cancel
             </Button>

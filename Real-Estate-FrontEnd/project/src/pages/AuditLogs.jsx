@@ -8,21 +8,36 @@ import PageHeader from '../components/ui/PageHeader';
 import { LoadingState, ErrorState, EmptyState } from '../components/ui/States';
 import { Search, ScrollText, Filter, X } from 'lucide-react';
 
-const ACTION_COLORS = {
-  LOGIN: { bg: '#F5F5F4', text: '#44403C', dot: '#A8A29E' },
-  CREATED: { bg: '#D1FAE5', text: '#065F46', dot: '#10B981' },
-  UPDATED: { bg: '#FEF3C7', text: '#92400E', dot: '#F59E0B' },
-  DELETED: { bg: '#FEE2E2', text: '#991B1B', dot: '#EF4444' },
-  BOOKED: { bg: '#F6E3DA', text: '#9A4A2A', dot: '#E7A58C' },
-  CANCELLED: { bg: '#FEE2E2', text: '#991B1B', dot: '#EF4444' },
-  ASSIGNED: { bg: '#DBEAFE', text: '#1E40AF', dot: '#3B82F6' },
-};
+const AUDIT_CACHE_PREFIX = 'raiz_audit_cache_';
+const AUDIT_CACHE_TIME = 5 * 60 * 1000;
+
+function getAuditCacheKey(actionFilter, entityFilter, userFilter) {
+  return `${AUDIT_CACHE_PREFIX}${encodeURIComponent(actionFilter || '')}_${encodeURIComponent(entityFilter || '')}_${encodeURIComponent(userFilter || '')}`;
+}
+
+function readAuditCache(key) {
+  try {
+    const cached = sessionStorage.getItem(key);
+    if (!cached) return null;
+
+    const parsed = JSON.parse(cached);
+    if (parsed?.timestamp && Date.now() - parsed.timestamp < AUDIT_CACHE_TIME) {
+      return Array.isArray(parsed.data) ? parsed.data : [];
+    }
+
+    sessionStorage.removeItem(key);
+  } catch {
+    sessionStorage.removeItem(key);
+  }
+
+  return null;
+}
 
 export default function AuditLogs() {
   const { showError } = useToast();
 
   const [logs, setLogs] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   const [search, setSearch] = useState('');
@@ -31,17 +46,46 @@ export default function AuditLogs() {
   const [userFilter, setUserFilter] = useState('');
 
   const fetchLogs = useCallback(async () => {
-    setLoading(true);
+    const cacheKey = getAuditCacheKey(
+      actionFilter,
+      entityFilter,
+      userFilter
+    );
+
+    const cachedLogs = readAuditCache(cacheKey);
+
+    if (cachedLogs !== null) {
+      setLogs(cachedLogs);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
+
     setError(null);
+
     try {
       const params = {};
       if (actionFilter) params.action = actionFilter;
       if (entityFilter) params.entity = entityFilter;
       if (userFilter) params.userId = userFilter;
+
       const res = await auditApi.getAll(params);
-      setLogs(Array.isArray(res.data) ? res.data : []);
+      const freshLogs = Array.isArray(res.data) ? res.data : [];
+
+      setLogs(freshLogs);
+
+      sessionStorage.setItem(
+        cacheKey,
+        JSON.stringify({
+          data: freshLogs,
+          timestamp: Date.now(),
+        })
+      );
     } catch (err) {
-      setError(err.message || 'Unable to load audit logs.');
+      if (cachedLogs === null) {
+        setError(err.message || 'Unable to load audit logs.');
+      }
+
       if (err.status !== 0) showError(err.message);
     } finally {
       setLoading(false);
@@ -154,4 +198,15 @@ export default function AuditLogs() {
     </div>
   );
 }
+
+const ACTION_COLORS = {
+  LOGIN: { bg: '#F5F5F4', text: '#44403C', dot: '#A8A29E' },
+  CREATED: { bg: '#D1FAE5', text: '#065F46', dot: '#10B981' },
+  UPDATED: { bg: '#FEF3C7', text: '#92400E', dot: '#F59E0B' },
+  DELETED: { bg: '#FEE2E2', text: '#991B1B', dot: '#EF4444' },
+  BOOKED: { bg: '#F6E3DA', text: '#9A4A2A', dot: '#E7A58C' },
+  CANCELLED: { bg: '#FEE2E2', text: '#991B1B', dot: '#EF4444' },
+  ASSIGNED: { bg: '#DBEAFE', text: '#1E40AF', dot: '#3B82F6' },
+};
+
 // AuditLogs.jsx

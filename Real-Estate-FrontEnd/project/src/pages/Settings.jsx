@@ -1,98 +1,500 @@
+import { useState, useEffect, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useToast } from '../context/ToastContext';
+import bookingApi from '../api/bookingApi';
+import leadApi from '../api/leadApi';
+import propertyApi from '../api/propertyApi';
+import { ROLES, formatCurrency, formatDate } from '../utils/constants';
+import { Input } from '../components/ui/FormField';
 import Button from '../components/ui/Button';
+import StatusBadge from '../components/ui/StatusBadge';
+import Modal from '../components/ui/Modal';
 import PageHeader from '../components/ui/PageHeader';
-import { LogOut, Mail, Shield, User as UserIcon, Building } from 'lucide-react';
+import { LoadingState, ErrorState, EmptyState } from '../components/ui/States';
+import { Plus, Search, Check, ChevronRight, ChevronLeft, X, ClipboardList, Building2, User as UserIcon, IndianRupee } from 'lucide-react';
 
-export default function Settings() {
-  const { user, logout } = useAuth();
-  const navigate = useNavigate();
 
-  const roleLabel = (user?.role || '')
-    .split('_')
-    .map((w) => w.charAt(0) + w.slice(1).toLowerCase())
-    .join(' ');
+const BOOKINGS_CACHE_KEY = 'raiz_bookings_cache';
+const BOOKING_LEADS_CACHE_KEY = 'raiz_booking_leads_cache';
+const BOOKING_UNITS_CACHE_KEY = 'raiz_booking_units_cache';
+const BOOKINGS_CACHE_TIME = 5 * 60 * 1000;
 
-  const initials = (user?.name || 'U')
-    .split(' ')
-    .map((w) => w[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2);
+function readSimpleCache(key) {
+  try {
+    const cached = sessionStorage.getItem(key);
+    if (!cached) return null;
+
+    const parsed = JSON.parse(cached);
+    if (parsed?.timestamp && Date.now() - parsed.timestamp < BOOKINGS_CACHE_TIME) {
+      return parsed.data ?? null;
+    }
+
+    sessionStorage.removeItem(key);
+  } catch {
+    sessionStorage.removeItem(key);
+  }
+
+  return null;
+}
+
+function writeSimpleCache(key, data) {
+  try {
+    sessionStorage.setItem(
+      key,
+      JSON.stringify({ data, timestamp: Date.now() })
+    );
+  } catch {
+    // Ignore storage errors.
+  }
+}
+
+export default function Bookings() {
+  const { user, hasRole } = useAuth();
+  const { showSuccess, showError } = useToast();
+  const location = useLocation();
+  const canCreate = hasRole([ROLES.ADMIN, ROLES.SALES, ROLES.BACK_OFFICE]);
+  const isAuditor = user?.role === ROLES.AUDITOR;
+
+  const [bookings, setBookings] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [search, setSearch] = useState('');
+
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [step, setStep] = useState(1);
+  const [leads, setLeads] = useState([]);
+  const [units, setUnits] = useState([]);
+  const [wizardLoading, setWizardLoading] = useState(false);
+  const [selectedLead, setSelectedLead] = useState(null);
+  const [selectedUnit, setSelectedUnit] = useState(null);
+  const [leadSearch, setLeadSearch] = useState('');
+  const [unitSearch, setUnitSearch] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [confirmedBooking, setConfirmedBooking] = useState(null);
+
+  const fetchBookings = useCallback(async () => {
+    const cachedBookings = readSimpleCache(BOOKINGS_CACHE_KEY);
+
+    if (cachedBookings !== null) {
+      setBookings(Array.isArray(cachedBookings) ? cachedBookings : []);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
+
+    setError(null);
+
+    try {
+      const res = await bookingApi.getAll();
+      const freshBookings = Array.isArray(res.data) ? res.data : [];
+
+      setBookings(freshBookings);
+      writeSimpleCache(BOOKINGS_CACHE_KEY, freshBookings);
+    } catch (err) {
+      if (cachedBookings === null) {
+        setError(err.message || 'Unable to load bookings.');
+      }
+
+      if (err.status !== 0) showError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [showError]);
+
+  useEffect(() => {
+    fetchBookings();
+  }, [fetchBookings]);
+
+  // Preselect unit from Properties page
+  useEffect(() => {
+    if (location.state?.preselectUnit && canCreate) {
+      setSelectedUnit(location.state.preselectUnit);
+      setStep(1);
+      setWizardOpen(true);
+      // Fetch leads and units for the wizard
+      openWizard();
+    }
+  }, [location.state]);
+
+  const openWizard = async () => {
+    setWizardOpen(true);
+    setStep(1);
+    setSelectedLead(null);
+
+    const cachedLeads = readSimpleCache(BOOKING_LEADS_CACHE_KEY);
+    const cachedUnits = readSimpleCache(BOOKING_UNITS_CACHE_KEY);
+    const hasCachedWizardData = cachedLeads !== null || cachedUnits !== null;
+
+    if (cachedLeads !== null) {
+      setLeads(Array.isArray(cachedLeads) ? cachedLeads : []);
+    }
+
+    if (cachedUnits !== null) {
+      setUnits(
+        (Array.isArray(cachedUnits) ? cachedUnits : []).filter(
+          (u) => (u.status || '').toUpperCase() === 'AVAILABLE'
+        )
+      );
+    }
+
+    setWizardLoading(!hasCachedWizardData);
+
+    try {
+      const [leadRes, unitRes] = await Promise.all([
+        leadApi.getAll(),
+        propertyApi.getUnits(),
+      ]);
+
+      const freshLeads = Array.isArray(leadRes.data) ? leadRes.data : [];
+      const freshUnits = Array.isArray(unitRes.data) ? unitRes.data : [];
+
+      setLeads(freshLeads);
+      setUnits(
+        freshUnits.filter(
+          (u) => (u.status || '').toUpperCase() === 'AVAILABLE'
+        )
+      );
+
+      writeSimpleCache(BOOKING_LEADS_CACHE_KEY, freshLeads);
+      writeSimpleCache(BOOKING_UNITS_CACHE_KEY, freshUnits);
+    } catch (err) {
+      if (!hasCachedWizardData) {
+        showError(err.message || 'Unable to load data for booking.');
+      }
+    } finally {
+      setWizardLoading(false);
+    }
+  };
+
+  const closeWizard = () => {
+    setWizardOpen(false);
+    setStep(1);
+    setSelectedLead(null);
+    setSelectedUnit(null);
+    setLeadSearch('');
+    setUnitSearch('');
+    setConfirmedBooking(null);
+  };
+
+  const handleConfirm = async () => {
+    if (!selectedLead || !selectedUnit) return;
+    setSubmitting(true);
+    try {
+      const payload = {
+        leadId: selectedLead.id,
+        unitId: selectedUnit.id,
+      };
+      const res = await bookingApi.create(payload);
+      setConfirmedBooking(res.data);
+      showSuccess('Booking confirmed successfully.');
+      sessionStorage.removeItem(BOOKING_UNITS_CACHE_KEY);
+      fetchBookings();
+    } catch (err) {
+      if (err.status === 409) {
+        showError('This unit was just booked by another user. Please select another available unit.');
+        setStep(2);
+        // Remove the booked unit from list
+        setUnits((prev) => prev.filter((u) => u.id !== selectedUnit.id));
+        setSelectedUnit(null);
+      } else {
+        showError(err.message || 'Failed to create booking.');
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const filteredLeads = leads.filter((l) => {
+    if (!leadSearch) return true;
+    const q = leadSearch.toLowerCase();
+    return (l.name || '').toLowerCase().includes(q) || (l.phone || '').toLowerCase().includes(q);
+  });
+
+  const filteredUnits = units.filter((u) => {
+    if (!unitSearch) return true;
+    const q = unitSearch.toLowerCase();
+    return `${u.unitNumber || ''} ${u.unitType || ''} ${u.projectName || u.project?.name || ''}`.toLowerCase().includes(q);
+  });
+
+  const filteredBookings = bookings.filter((b) => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return `${b.leadName || b.lead?.name || ''} ${b.unitNumber || b.unit?.unitNumber || ''} ${b.projectName || b.project?.name || ''}`.toLowerCase().includes(q);
+  });
 
   return (
     <div>
-      <PageHeader title="Settings" description="Your account & application information." />
-
-      <div className="max-w-2xl space-y-6">
-        {/* Profile */}
-        <div className="rounded-lg border border-raiz-border bg-white p-6">
-          <h3 className="text-sm font-semibold text-raiz-black uppercase tracking-wide mb-5">Profile</h3>
-
-          <div className="flex items-center gap-4 mb-6">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-raiz-black text-white text-lg font-semibold shrink-0">
-              {initials}
-            </div>
-            <div>
-              <div className="font-serif text-xl font-semibold text-raiz-black">{user?.name}</div>
-              <div className="text-sm text-raiz-secondary mt-0.5">{roleLabel}</div>
-            </div>
-          </div>
-
-          <div className="space-y-4 pt-4 border-t border-raiz-border">
-            <SettingRow icon={UserIcon} label="Name" value={user?.name} />
-            <SettingRow icon={Mail} label="Email" value={user?.email} />
-            <SettingRow icon={Shield} label="Role" value={roleLabel} />
-            <SettingRow icon={Building} label="User ID" value={String(user?.userId || '—')} />
-          </div>
-        </div>
-
-        {/* Application Info */}
-        <div className="rounded-lg border border-raiz-border bg-white p-6">
-          <h3 className="text-sm font-semibold text-raiz-black uppercase tracking-wide mb-5">Application</h3>
-          <div className="space-y-4">
-            <SettingRow label="Application" value="Raiz Realtors CRM" />
-            <SettingRow label="Version" value="1.0.0" />
-            <SettingRow label="Environment" value="Development" />
-            <SettingRow
-              label="API Base URL"
-              value={import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api'}
-              mono
-            />
-          </div>
-        </div>
-
-        {/* Logout */}
-        <div className="rounded-lg border border-raiz-border bg-white p-6">
-          <h3 className="text-sm font-semibold text-raiz-black uppercase tracking-wide mb-3">Session</h3>
-          <p className="text-sm text-raiz-secondary mb-4">
-            You are currently signed in. You can sign out at any time.
-          </p>
-          <Button
-            variant="danger"
-            onClick={() => {
-              logout();
-              navigate('/login');
-            }}
-          >
-            <LogOut size={15} />
-            Sign Out
+      <PageHeader title="Bookings" description="Transaction records & new booking flow.">
+        {canCreate && (
+          <Button onClick={openWizard}>
+            <Plus size={15} />
+            New Booking
           </Button>
-        </div>
+        )}
+      </PageHeader>
+
+      {/* Search */}
+      <div className="mb-5">
+        <Input
+          placeholder="Search bookings…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          icon={<Search size={14} />}
+        />
+      </div>
+
+      {/* Bookings table */}
+      <div className="rounded-lg border border-raiz-border bg-white overflow-hidden">
+        {loading ? (
+          <LoadingState label="Loading bookings…" />
+        ) : error ? (
+          <ErrorState message={error} onRetry={fetchBookings} />
+        ) : filteredBookings.length === 0 ? (
+          <EmptyState
+            title="No Bookings Yet"
+            description="Transactions will appear here once a booking is made."
+            action={canCreate ? <Button onClick={openWizard}><Plus size={15} /> New Booking</Button> : null}
+          />
+        ) : (
+          <div className="overflow-x-auto scrollbar-thin">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-raiz-border bg-raiz-offwhite/50">
+                  <Th>Booking ID</Th>
+                  <Th>Lead</Th>
+                  <Th>Project</Th>
+                  <Th>Unit</Th>
+                  <Th className="text-right">Amount</Th>
+                  <Th>Booked By</Th>
+                  <Th>Date</Th>
+                  <Th>Status</Th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-raiz-border">
+                {filteredBookings.map((b) => (
+                  <tr key={b.id} className="hover:bg-raiz-offwhite/40 transition-colors">
+                    <td className="px-4 py-3 font-medium text-raiz-black whitespace-nowrap">
+                      {b.bookingId ? `#${b.bookingId}` : `#${b.id}`}
+                    </td>
+                    <td className="px-4 py-3 text-raiz-black">{b.leadName || b.lead?.name || '—'}</td>
+                    <td className="px-4 py-3 text-raiz-secondary">{b.projectName || b.project?.name || '—'}</td>
+                    <td className="px-4 py-3 text-raiz-secondary">{b.unitNumber || b.unit?.unitNumber || '—'}</td>
+                    <td className="px-4 py-3 text-right font-medium text-raiz-black whitespace-nowrap">{formatCurrency(b.price || b.amount)}</td>
+                    <td className="px-4 py-3 text-raiz-secondary">{b.bookedByName || b.bookedBy?.name || '—'}</td>
+                    <td className="px-4 py-3 text-raiz-secondary whitespace-nowrap">{formatDate(b.bookingDate)}</td>
+                    <td className="px-4 py-3">
+                      <StatusBadge status={b.status || 'BOOKED'} type="unit" size="xs" />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Booking Wizard Modal */}
+      <Modal
+        open={wizardOpen}
+        onClose={closeWizard}
+        title={confirmedBooking ? 'Booking Confirmed' : 'New Booking'}
+        width="max-w-2xl"
+        footer={
+          confirmedBooking ? (
+            <Button size="sm" onClick={closeWizard}>Done</Button>
+          ) : wizardLoading ? null : (
+            <>
+              {step > 1 && (
+                <Button variant="secondary" size="sm" onClick={() => setStep(step - 1)}>
+                  <ChevronLeft size={14} /> Back
+                </Button>
+              )}
+              {step === 1 && selectedLead && (
+                <Button size="sm" onClick={() => setStep(2)}>
+                  Next: Select Unit <ChevronRight size={14} />
+                </Button>
+              )}
+              {step === 2 && selectedUnit && (
+                <Button size="sm" onClick={() => setStep(3)}>
+                  Next: Confirm <ChevronRight size={14} />
+                </Button>
+              )}
+              {step === 3 && (
+                <Button size="sm" onClick={handleConfirm} loading={submitting}>
+                  Confirm Booking
+                </Button>
+              )}
+            </>
+          )
+        }
+      >
+        {confirmedBooking ? (
+          <ConfirmationView booking={confirmedBooking} />
+        ) : wizardLoading ? (
+          <LoadingState label="Loading data…" />
+        ) : (
+          <>
+            {/* Stepper */}
+            <div className="flex items-center gap-2 mb-6">
+              <StepIndicator num={1} label="Select Lead" active={step >= 1} done={step > 1} />
+              <div className={`h-px flex-1 ${step > 1 ? 'bg-raiz-peach' : 'bg-raiz-border'}`} />
+              <StepIndicator num={2} label="Select Unit" active={step >= 2} done={step > 2} />
+              <div className={`h-px flex-1 ${step > 2 ? 'bg-raiz-peach' : 'bg-raiz-border'}`} />
+              <StepIndicator num={3} label="Confirm" active={step >= 3} done={false} />
+            </div>
+
+            {/* Step 1 — Select Lead */}
+            {step === 1 && (
+              <div>
+                <Input
+                  placeholder="Search leads by name or phone…"
+                  value={leadSearch}
+                  onChange={(e) => setLeadSearch(e.target.value)}
+                  icon={<Search size={14} />}
+                />
+                <div className="mt-3 max-h-72 overflow-y-auto scrollbar-thin divide-y divide-raiz-border rounded-lg border border-raiz-border">
+                  {filteredLeads.length === 0 ? (
+                    <p className="text-sm text-raiz-secondary text-center py-6">No leads found.</p>
+                  ) : (
+                    filteredLeads.map((lead) => (
+                      <button
+                        key={lead.id}
+                        onClick={() => setSelectedLead(lead)}
+                        className={`w-full flex items-center justify-between px-4 py-3 text-left transition-colors ${
+                          selectedLead?.id === lead.id
+                            ? 'bg-raiz-peach-light/40'
+                            : 'hover:bg-raiz-offwhite'
+                        }`}
+                      >
+                        <div>
+                          <div className="text-sm font-medium text-raiz-black">{lead.name}</div>
+                          <div className="text-xs text-raiz-secondary">{lead.phone} · {lead.email}</div>
+                        </div>
+                        {selectedLead?.id === lead.id && <Check size={16} className="text-raiz-peach" />}
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Step 2 — Select Unit */}
+            {step === 2 && (
+              <div>
+                <Input
+                  placeholder="Search available units…"
+                  value={unitSearch}
+                  onChange={(e) => setUnitSearch(e.target.value)}
+                  icon={<Search size={14} />}
+                />
+                <div className="mt-3 max-h-72 overflow-y-auto scrollbar-thin divide-y divide-raiz-border rounded-lg border border-raiz-border">
+                  {filteredUnits.length === 0 ? (
+                    <p className="text-sm text-raiz-secondary text-center py-6">No available units found.</p>
+                  ) : (
+                    filteredUnits.map((unit) => (
+                      <button
+                        key={unit.id}
+                        onClick={() => setSelectedUnit(unit)}
+                        className={`w-full flex items-center justify-between px-4 py-3 text-left transition-colors ${
+                          selectedUnit?.id === unit.id
+                            ? 'bg-raiz-peach-light/40'
+                            : 'hover:bg-raiz-offwhite'
+                        }`}
+                      >
+                        <div>
+                          <div className="text-sm font-medium text-raiz-black">{unit.unitNumber} · {unit.unitType}</div>
+                          <div className="text-xs text-raiz-secondary">
+                            {unit.buildingName || unit.building?.name || '—'} · {unit.projectName || unit.project?.name || '—'}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-sm font-medium text-raiz-black">{formatCurrency(unit.price)}</div>
+                          {selectedUnit?.id === unit.id && <Check size={14} className="text-raiz-peach ml-auto mt-1" />}
+                        </div>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Step 3 — Confirm */}
+            {step === 3 && (
+              <div className="space-y-4">
+                <p className="text-sm text-raiz-secondary">Please review the booking details before confirming.</p>
+                <div className="rounded-lg border border-raiz-border divide-y divide-raiz-border">
+                  <SummaryRow icon={UserIcon} label="Lead" value={selectedLead?.name} />
+                  <SummaryRow icon={Building2} label="Project" value={selectedUnit?.projectName || selectedUnit?.project?.name} />
+                  <SummaryRow icon={Building2} label="Building" value={selectedUnit?.buildingName || selectedUnit?.building?.name} />
+                  <SummaryRow icon={ClipboardList} label="Unit" value={`${selectedUnit?.unitNumber} · ${selectedUnit?.unitType || ''}`} />
+                  <SummaryRow icon={IndianRupee} label="Price" value={formatCurrency(selectedUnit?.price)} />
+                  <SummaryRow icon={UserIcon} label="Booked By" value={user?.name} />
+                  <SummaryRow icon={ClipboardList} label="Booking Date" value={formatDate(new Date())} />
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </Modal>
+    </div>
+  );
+}
+
+function StepIndicator({ num, label, active, done }) {
+  return (
+    <div className="flex items-center gap-2 shrink-0">
+      <div
+        className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold transition-colors ${
+          done
+            ? 'bg-raiz-peach text-white'
+            : active
+            ? 'bg-raiz-black text-white'
+            : 'bg-raiz-offwhite text-raiz-secondary border border-raiz-border'
+        }`}
+      >
+        {done ? <Check size={13} /> : num}
+      </div>
+      <span className={`text-xs font-medium ${active ? 'text-raiz-black' : 'text-raiz-secondary'} hidden sm:inline`}>
+        {label}
+      </span>
+    </div>
+  );
+}
+
+function SummaryRow({ icon: Icon, label, value }) {
+  return (
+    <div className="flex items-center gap-3 px-4 py-3">
+      <Icon size={15} className="text-raiz-secondary shrink-0" />
+      <span className="text-xs font-medium tracking-wide text-raiz-secondary uppercase w-24 shrink-0">{label}</span>
+      <span className="text-sm text-raiz-black font-medium">{value || '—'}</span>
+    </div>
+  );
+}
+
+function ConfirmationView({ booking }) {
+  return (
+    <div className="text-center py-4">
+      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-green-50 border border-green-100 mb-4">
+        <Check size={24} className="text-green-600" />
+      </div>
+      <h3 className="font-serif text-xl font-semibold text-raiz-black">Booking Confirmed</h3>
+      <p className="mt-1 text-sm text-raiz-secondary">The unit has been successfully booked.</p>
+
+      <div className="mt-5 rounded-lg border border-raiz-border divide-y divide-raiz-border text-left">
+        <SummaryRow icon={ClipboardList} label="Booking ID" value={booking.bookingId ? `#${booking.bookingId}` : `#${booking.id}`} />
+        <SummaryRow icon={UserIcon} label="Lead" value={booking.leadName || booking.lead?.name} />
+        <SummaryRow icon={Building2} label="Unit" value={booking.unitNumber || booking.unit?.unitNumber} />
+        <SummaryRow icon={IndianRupee} label="Price" value={formatCurrency(booking.price || booking.amount)} />
       </div>
     </div>
   );
 }
 
-function SettingRow({ icon: Icon, label, value, mono }) {
+function Th({ children, className = '' }) {
   return (
-    <div className="flex items-center justify-between gap-4">
-      <div className="flex items-center gap-2.5">
-        {Icon && <Icon size={15} className="text-raiz-secondary" />}
-        <span className="text-sm text-raiz-secondary">{label}</span>
-      </div>
-      <span className={`text-sm font-medium text-raiz-black ${mono ? 'font-mono text-xs' : ''}`}>{value || '—'}</span>
-    </div>
+    <th className={`px-4 py-3 text-left text-10 font-semibold tracking-wide text-raiz-secondary uppercase ${className}`}>
+      {children}
+    </th>
   );
 }
-// Settings.jsx

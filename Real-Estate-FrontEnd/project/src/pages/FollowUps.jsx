@@ -1,52 +1,135 @@
 import React, { useEffect, useMemo, useState } from "react";
 import leadApi from "../api/leadApi";
 
+const FOLLOWUPS_CACHE_KEY = "raiz_followups_cache";
+const FOLLOWUPS_CACHE_TIME = 5 * 60 * 1000; // 5 minutes
+
 export default function FollowUps() {
-  const [leads, setLeads] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // Load cached leads immediately
+  const [leads, setLeads] = useState(() => {
+    try {
+      const cached = sessionStorage.getItem(
+        FOLLOWUPS_CACHE_KEY
+      );
+
+      if (!cached) return [];
+
+      const parsed = JSON.parse(cached);
+
+      if (
+        parsed?.timestamp &&
+        Date.now() - parsed.timestamp < FOLLOWUPS_CACHE_TIME
+      ) {
+        return Array.isArray(parsed.data)
+          ? parsed.data
+          : [];
+      }
+
+      sessionStorage.removeItem(
+        FOLLOWUPS_CACHE_KEY
+      );
+
+      return [];
+    } catch {
+      sessionStorage.removeItem(
+        FOLLOWUPS_CACHE_KEY
+      );
+
+      return [];
+    }
+  });
+
+  // Only show loading when no valid cache exists
+  const [loading, setLoading] = useState(() => {
+    try {
+      const cached = sessionStorage.getItem(
+        FOLLOWUPS_CACHE_KEY
+      );
+
+      if (!cached) return true;
+
+      const parsed = JSON.parse(cached);
+
+      return !(
+        parsed?.timestamp &&
+        Date.now() - parsed.timestamp < FOLLOWUPS_CACHE_TIME
+      );
+    } catch {
+      return true;
+    }
+  });
+
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
 
-  useEffect(() => {
-    loadFollowUps();
-  }, []);
-
   const loadFollowUps = async () => {
-    try {
+    // Don't hide cached data while refreshing
+    if (leads.length === 0) {
       setLoading(true);
-      setError("");
+    }
 
+    setError("");
+
+    try {
       const response = await leadApi.getAll();
 
       const data = Array.isArray(response.data)
         ? response.data
         : [];
 
+      // Update visible data
       setLeads(data);
-    } catch (err) {
-      console.error("Failed to load follow-ups:", err);
 
-      if (err.response?.status === 401) {
-        setError("Your session has expired. Please login again.");
-      } else if (err.response?.status === 403) {
-        setError("You do not have permission to view follow-ups.");
-      } else {
-        setError("Unable to load follow-ups.");
+      // Save fresh data
+      sessionStorage.setItem(
+        FOLLOWUPS_CACHE_KEY,
+        JSON.stringify({
+          data,
+          timestamp: Date.now(),
+        })
+      );
+    } catch (err) {
+      console.error(
+        "Failed to load follow-ups:",
+        err
+      );
+
+      // Keep cached data visible if available
+      if (leads.length === 0) {
+        if (err.response?.status === 401) {
+          setError(
+            "Your session has expired. Please login again."
+          );
+        } else if (err.response?.status === 403) {
+          setError(
+            "You do not have permission to view follow-ups."
+          );
+        } else {
+          setError(
+            "Unable to load follow-ups."
+          );
+        }
       }
     } finally {
       setLoading(false);
     }
   };
 
+  useEffect(() => {
+    loadFollowUps();
+  }, []);
+
   const followUps = useMemo(() => {
     return leads
       .filter((lead) => lead.followUpDate)
       .filter((lead) => {
-        const text = `${lead.name || ""} ${lead.phone || ""} ${
-          lead.email || ""
-        }`.toLowerCase();
+        const text = `${lead.name || ""} ${
+          lead.phone || ""
+        } ${lead.email || ""}`.toLowerCase();
 
-        return text.includes(search.toLowerCase());
+        return text.includes(
+          search.toLowerCase()
+        );
       })
       .sort((a, b) => {
         return (
@@ -59,11 +142,14 @@ export default function FollowUps() {
   const formatDate = (date) => {
     if (!date) return "—";
 
-    return new Date(date).toLocaleDateString("en-IN", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
+    return new Date(date).toLocaleDateString(
+      "en-IN",
+      {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      }
+    );
   };
 
   const getStatus = (date) => {
@@ -77,14 +163,16 @@ export default function FollowUps() {
 
     if (followUp < today) return "Overdue";
 
-    if (followUp.getTime() === today.getTime()) return "Today";
+    if (followUp.getTime() === today.getTime()) {
+      return "Today";
+    }
 
     return "Upcoming";
   };
 
   return (
     <div className="min-h-screen bg-[#FAF9F7] p-6 md:p-8">
-      
+
       {/* Header */}
       <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
@@ -114,7 +202,9 @@ export default function FollowUps() {
             type="text"
             placeholder="Search leads by name, phone or email..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) =>
+              setSearch(e.target.value)
+            }
             className="w-full border border-[#E5E2DF] bg-white px-4 py-4 text-sm text-[#111111] outline-none transition focus:border-[#111111]"
           />
         </div>
@@ -146,112 +236,128 @@ export default function FollowUps() {
       )}
 
       {/* Empty */}
-      {!loading && !error && followUps.length === 0 && (
-        <div className="border border-[#E5E2DF] bg-white p-16 text-center">
-          <h2 className="font-serif text-2xl text-[#111111]">
-            No follow-ups found
-          </h2>
+      {!loading &&
+        !error &&
+        followUps.length === 0 && (
+          <div className="border border-[#E5E2DF] bg-white p-16 text-center">
+            <h2 className="font-serif text-2xl text-[#111111]">
+              No follow-ups found
+            </h2>
 
-          <p className="mt-2 text-sm text-[#6B6865]">
-            Leads with scheduled follow-up dates will appear here.
-          </p>
-        </div>
-      )}
+            <p className="mt-2 text-sm text-[#6B6865]">
+              Leads with scheduled follow-up dates will appear here.
+            </p>
+          </div>
+        )}
 
       {/* Table */}
-      {!loading && !error && followUps.length > 0 && (
-        <div className="overflow-hidden border border-[#E5E2DF] bg-white">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[800px]">
-              <thead>
-                <tr className="border-b border-[#E5E2DF] bg-[#FAF9F7]">
-                  <th className="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-[#6B6865]">
-                    Lead
-                  </th>
+      {!loading &&
+        !error &&
+        followUps.length > 0 && (
+          <div className="overflow-hidden border border-[#E5E2DF] bg-white">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[800px]">
 
-                  <th className="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-[#6B6865]">
-                    Contact
-                  </th>
+                <thead>
+                  <tr className="border-b border-[#E5E2DF] bg-[#FAF9F7]">
 
-                  <th className="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-[#6B6865]">
-                    Follow-up Date
-                  </th>
+                    <th className="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-[#6B6865]">
+                      Lead
+                    </th>
 
-                  <th className="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-[#6B6865]">
-                    Stage
-                  </th>
+                    <th className="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-[#6B6865]">
+                      Contact
+                    </th>
 
-                  <th className="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-[#6B6865]">
-                    Status
-                  </th>
-                </tr>
-              </thead>
+                    <th className="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-[#6B6865]">
+                      Follow-up Date
+                    </th>
 
-              <tbody>
-                {followUps.map((lead) => {
-                  const status = getStatus(lead.followUpDate);
+                    <th className="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-[#6B6865]">
+                      Stage
+                    </th>
 
-                  return (
-                    <tr
-                      key={lead.id}
-                      className="border-b border-[#E5E2DF] last:border-b-0 hover:bg-[#FAF9F7]"
-                    >
-                      <td className="px-6 py-5">
-                        <div className="font-medium text-[#111111]">
-                          {lead.name}
-                        </div>
+                    <th className="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-[#6B6865]">
+                      Status
+                    </th>
 
-                        {lead.notes && (
-                          <div className="mt-1 max-w-xs truncate text-xs text-[#8A8580]">
-                            {lead.notes}
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {followUps.map((lead) => {
+                    const status = getStatus(
+                      lead.followUpDate
+                    );
+
+                    return (
+                      <tr
+                        key={lead.id}
+                        className="border-b border-[#E5E2DF] last:border-b-0 hover:bg-[#FAF9F7]"
+                      >
+
+                        <td className="px-6 py-5">
+                          <div className="font-medium text-[#111111]">
+                            {lead.name}
                           </div>
-                        )}
-                      </td>
 
-                      <td className="px-6 py-5">
-                        <div className="text-sm text-[#242424]">
-                          {lead.phone || "—"}
-                        </div>
+                          {lead.notes && (
+                            <div className="mt-1 max-w-xs truncate text-xs text-[#8A8580]">
+                              {lead.notes}
+                            </div>
+                          )}
+                        </td>
 
-                        <div className="mt-1 text-xs text-[#8A8580]">
-                          {lead.email || "—"}
-                        </div>
-                      </td>
+                        <td className="px-6 py-5">
+                          <div className="text-sm text-[#242424]">
+                            {lead.phone || "—"}
+                          </div>
 
-                      <td className="px-6 py-5 text-sm text-[#242424]">
-                        {formatDate(lead.followUpDate)}
-                      </td>
+                          <div className="mt-1 text-xs text-[#8A8580]">
+                            {lead.email || "—"}
+                          </div>
+                        </td>
 
-                      <td className="px-6 py-5">
-                        <span className="text-sm text-[#242424]">
-                          {lead.stage
-                            ? lead.stage.replaceAll("_", " ")
-                            : "NEW"}
-                        </span>
-                      </td>
+                        <td className="px-6 py-5 text-sm text-[#242424]">
+                          {formatDate(
+                            lead.followUpDate
+                          )}
+                        </td>
 
-                      <td className="px-6 py-5">
-                        <span
-                          className={`inline-flex border px-3 py-1 text-xs font-medium ${
-                            status === "Overdue"
-                              ? "border-red-200 bg-red-50 text-red-700"
-                              : status === "Today"
-                              ? "border-[#E7A58C] bg-[#F6E3DA] text-[#111111]"
-                              : "border-[#E5E2DF] bg-white text-[#6B6865]"
-                          }`}
-                        >
-                          {status}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                        <td className="px-6 py-5">
+                          <span className="text-sm text-[#242424]">
+                            {lead.stage
+                              ? lead.stage.replaceAll(
+                                  "_",
+                                  " "
+                                )
+                              : "NEW"}
+                          </span>
+                        </td>
+
+                        <td className="px-6 py-5">
+                          <span
+                            className={`inline-flex border px-3 py-1 text-xs font-medium ${
+                              status === "Overdue"
+                                ? "border-red-200 bg-red-50 text-red-700"
+                                : status === "Today"
+                                ? "border-[#E7A58C] bg-[#F6E3DA] text-[#111111]"
+                                : "border-[#E5E2DF] bg-white text-[#6B6865]"
+                            }`}
+                          >
+                            {status}
+                          </span>
+                        </td>
+
+                      </tr>
+                    );
+                  })}
+                </tbody>
+
+              </table>
+            </div>
           </div>
-        </div>
-      )}
+        )}
     </div>
   );
 }
-// FollowUps.jsx

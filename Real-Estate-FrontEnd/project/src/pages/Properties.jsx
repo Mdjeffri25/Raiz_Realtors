@@ -21,6 +21,28 @@ import {
   X
 } from 'lucide-react';
 
+
+const PROPERTIES_CACHE_KEY = 'raiz_properties_cache';
+const PROPERTIES_CACHE_TIME = 5 * 60 * 1000;
+
+function readPropertiesCache() {
+  try {
+    const cached = sessionStorage.getItem(PROPERTIES_CACHE_KEY);
+    if (!cached) return null;
+
+    const parsed = JSON.parse(cached);
+    if (parsed?.timestamp && Date.now() - parsed.timestamp < PROPERTIES_CACHE_TIME) {
+      return parsed.data || null;
+    }
+
+    sessionStorage.removeItem(PROPERTIES_CACHE_KEY);
+  } catch {
+    sessionStorage.removeItem(PROPERTIES_CACHE_KEY);
+  }
+
+  return null;
+}
+
 export default function Properties() {
 
   const { hasRole } = useAuth();
@@ -42,7 +64,7 @@ export default function Properties() {
   const [buildings, setBuildings] = useState([]);
   const [units, setUnits] = useState([]);
 
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   const [search, setSearch] = useState('');
@@ -74,7 +96,17 @@ export default function Properties() {
 
   const fetchData = useCallback(async () => {
 
-    setLoading(true);
+    const cached = readPropertiesCache();
+
+    if (cached) {
+      setProjects(Array.isArray(cached.projects) ? cached.projects : []);
+      setUnits(Array.isArray(cached.units) ? cached.units : []);
+      setBuildings(Array.isArray(cached.buildings) ? cached.buildings : []);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
+
     setError(null);
 
     try {
@@ -86,30 +118,34 @@ export default function Properties() {
           axiosClient.get('/buildings')
         ]);
 
-      setProjects(
-        Array.isArray(projRes.data)
-          ? projRes.data
-          : []
-      );
+      const freshProjects = Array.isArray(projRes.data) ? projRes.data : [];
+      const freshUnits = Array.isArray(unitRes.data) ? unitRes.data : [];
+      const freshBuildings = Array.isArray(buildingRes.data) ? buildingRes.data : [];
 
-      setUnits(
-        Array.isArray(unitRes.data)
-          ? unitRes.data
-          : []
-      );
+      setProjects(freshProjects);
+      setUnits(freshUnits);
+      setBuildings(freshBuildings);
 
-      setBuildings(
-        Array.isArray(buildingRes.data)
-          ? buildingRes.data
-          : []
+      sessionStorage.setItem(
+        PROPERTIES_CACHE_KEY,
+        JSON.stringify({
+          data: {
+            projects: freshProjects,
+            units: freshUnits,
+            buildings: freshBuildings,
+          },
+          timestamp: Date.now(),
+        })
       );
 
     } catch (err) {
 
-      setError(
-        err.message ||
-        'Unable to load property data.'
-      );
+      if (!cached) {
+        setError(
+          err.message ||
+          'Unable to load property data.'
+        );
+      }
 
       if (err.status !== 0) {
         showError(err.message);
