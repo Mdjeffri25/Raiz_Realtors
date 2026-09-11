@@ -1,11 +1,31 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { Input } from '../components/ui/FormField';
 import Button from '../components/ui/Button';
+import axiosClient from '../api/axiosClient';
 
 export default function Login() {
+
+  //   useEffect(() => {
+  //   axiosClient.get('/health').catch(() => {
+  //     // Render may be waking up. Ignore the initial error.
+  //   });
+  // }, []);
+  useEffect(() => {
+  const wakeBackend = async () => {
+    try {
+      await axiosClient.get('/health');
+      setBackendReady(true);
+    } catch (error) {
+      setBackendReady(false);
+    }
+  };
+
+  wakeBackend();
+}, []);
+
   const { login } = useAuth();
   const { showSuccess, showError } = useToast();
   const navigate = useNavigate();
@@ -15,6 +35,7 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [backendReady, setBackendReady] = useState(false);
 
   const from = location.state?.from?.pathname || '/dashboard';
 
@@ -119,13 +140,20 @@ export default function Login() {
                 <p className="text-xs text-red-600">{error}</p>
               </div>
             )}
-
-            <Button
-              type="submit"
-              className="w-full"
-              size="lg"
-              loading={loading}
-            >
+            <div className="text-center text-xs text-raiz-secondary">
+  {backendReady ? (
+    <span className="text-green-700">● CRM ready</span>
+  ) : (
+    <span>● Connecting to CRM...</span>
+  )}
+</div>
+            <Button 
+  type="submit" 
+  className="w-full" 
+  size="lg" 
+  loading={loading}
+  disabled={loading || !backendReady}
+>
               Sign in
             </Button>
           </form>
