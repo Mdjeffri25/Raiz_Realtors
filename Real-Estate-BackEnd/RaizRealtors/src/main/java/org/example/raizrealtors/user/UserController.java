@@ -7,7 +7,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
-
+import jakarta.validation.Valid;
+import org.springframework.security.core.Authentication;
 import java.util.List;
 
 @RestController
@@ -98,6 +99,41 @@ public class UserController {
                 userRepository.save(existingUser)
         );
     }
+
+    //Change Password
+    @PutMapping("/change-password")
+@PreAuthorize("isAuthenticated()")
+public ResponseEntity<String> changePassword(
+        @Valid @RequestBody ChangePasswordRequest request,
+        Authentication authentication) {
+
+    User user = userRepository.findByEmail(authentication.getName())
+            .orElseThrow(() -> new RuntimeException("User not found"));
+
+    if (!passwordEncoder.matches(
+            request.currentPassword(),
+            user.getPassword())) {
+
+        throw new RuntimeException("Current password is incorrect");
+    }
+
+    if (passwordEncoder.matches(
+            request.newPassword(),
+            user.getPassword())) {
+
+        throw new RuntimeException(
+                "New password must be different from current password"
+        );
+    }
+
+    user.setPassword(
+            passwordEncoder.encode(request.newPassword())
+    );
+
+    userRepository.save(user);
+
+    return ResponseEntity.ok("Password changed successfully");
+}
 
     // DELETE USER
     @DeleteMapping("/{id}")
