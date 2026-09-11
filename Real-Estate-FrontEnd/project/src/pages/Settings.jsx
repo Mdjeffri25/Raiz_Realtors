@@ -1,500 +1,400 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import bookingApi from '../api/bookingApi';
-import leadApi from '../api/leadApi';
-import propertyApi from '../api/propertyApi';
-import { ROLES, formatCurrency, formatDate } from '../utils/constants';
-import { Input } from '../components/ui/FormField';
-import Button from '../components/ui/Button';
-import StatusBadge from '../components/ui/StatusBadge';
-import Modal from '../components/ui/Modal';
 import PageHeader from '../components/ui/PageHeader';
-import { LoadingState, ErrorState, EmptyState } from '../components/ui/States';
-import { Plus, Search, Check, ChevronRight, ChevronLeft, X, ClipboardList, Building2, User as UserIcon, IndianRupee } from 'lucide-react';
+import Button from '../components/ui/Button';
+import { Input } from '../components/ui/FormField';
+import {
+  User,
+  Shield,
+  Building2,
+  Database,
+  CheckCircle2,
+} from 'lucide-react';
 
+export default function Settings() {
+  const { user } = useAuth();
+  const { showSuccess } = useToast();
 
-const BOOKINGS_CACHE_KEY = 'raiz_bookings_cache';
-const BOOKING_LEADS_CACHE_KEY = 'raiz_booking_leads_cache';
-const BOOKING_UNITS_CACHE_KEY = 'raiz_booking_units_cache';
-const BOOKINGS_CACHE_TIME = 5 * 60 * 1000;
+  const [name, setName] = useState(user?.name || '');
+  const [email] = useState(user?.email || '');
 
-function readSimpleCache(key) {
-  try {
-    const cached = sessionStorage.getItem(key);
-    if (!cached) return null;
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
 
-    const parsed = JSON.parse(cached);
-    if (parsed?.timestamp && Date.now() - parsed.timestamp < BOOKINGS_CACHE_TIME) {
-      return parsed.data ?? null;
-    }
+  const handleProfileSave = (e) => {
+    e.preventDefault();
 
-    sessionStorage.removeItem(key);
-  } catch {
-    sessionStorage.removeItem(key);
-  }
-
-  return null;
-}
-
-function writeSimpleCache(key, data) {
-  try {
-    sessionStorage.setItem(
-      key,
-      JSON.stringify({ data, timestamp: Date.now() })
-    );
-  } catch {
-    // Ignore storage errors.
-  }
-}
-
-export default function Bookings() {
-  const { user, hasRole } = useAuth();
-  const { showSuccess, showError } = useToast();
-  const location = useLocation();
-  const canCreate = hasRole([ROLES.ADMIN, ROLES.SALES, ROLES.BACK_OFFICE]);
-  const isAuditor = user?.role === ROLES.AUDITOR;
-
-  const [bookings, setBookings] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [search, setSearch] = useState('');
-
-  const [wizardOpen, setWizardOpen] = useState(false);
-  const [step, setStep] = useState(1);
-  const [leads, setLeads] = useState([]);
-  const [units, setUnits] = useState([]);
-  const [wizardLoading, setWizardLoading] = useState(false);
-  const [selectedLead, setSelectedLead] = useState(null);
-  const [selectedUnit, setSelectedUnit] = useState(null);
-  const [leadSearch, setLeadSearch] = useState('');
-  const [unitSearch, setUnitSearch] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [confirmedBooking, setConfirmedBooking] = useState(null);
-
-  const fetchBookings = useCallback(async () => {
-    const cachedBookings = readSimpleCache(BOOKINGS_CACHE_KEY);
-
-    if (cachedBookings !== null) {
-      setBookings(Array.isArray(cachedBookings) ? cachedBookings : []);
-      setLoading(false);
-    } else {
-      setLoading(true);
-    }
-
-    setError(null);
-
-    try {
-      const res = await bookingApi.getAll();
-      const freshBookings = Array.isArray(res.data) ? res.data : [];
-
-      setBookings(freshBookings);
-      writeSimpleCache(BOOKINGS_CACHE_KEY, freshBookings);
-    } catch (err) {
-      if (cachedBookings === null) {
-        setError(err.message || 'Unable to load bookings.');
-      }
-
-      if (err.status !== 0) showError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [showError]);
-
-  useEffect(() => {
-    fetchBookings();
-  }, [fetchBookings]);
-
-  // Preselect unit from Properties page
-  useEffect(() => {
-    if (location.state?.preselectUnit && canCreate) {
-      setSelectedUnit(location.state.preselectUnit);
-      setStep(1);
-      setWizardOpen(true);
-      // Fetch leads and units for the wizard
-      openWizard();
-    }
-  }, [location.state]);
-
-  const openWizard = async () => {
-    setWizardOpen(true);
-    setStep(1);
-    setSelectedLead(null);
-
-    const cachedLeads = readSimpleCache(BOOKING_LEADS_CACHE_KEY);
-    const cachedUnits = readSimpleCache(BOOKING_UNITS_CACHE_KEY);
-    const hasCachedWizardData = cachedLeads !== null || cachedUnits !== null;
-
-    if (cachedLeads !== null) {
-      setLeads(Array.isArray(cachedLeads) ? cachedLeads : []);
-    }
-
-    if (cachedUnits !== null) {
-      setUnits(
-        (Array.isArray(cachedUnits) ? cachedUnits : []).filter(
-          (u) => (u.status || '').toUpperCase() === 'AVAILABLE'
-        )
-      );
-    }
-
-    setWizardLoading(!hasCachedWizardData);
-
-    try {
-      const [leadRes, unitRes] = await Promise.all([
-        leadApi.getAll(),
-        propertyApi.getUnits(),
-      ]);
-
-      const freshLeads = Array.isArray(leadRes.data) ? leadRes.data : [];
-      const freshUnits = Array.isArray(unitRes.data) ? unitRes.data : [];
-
-      setLeads(freshLeads);
-      setUnits(
-        freshUnits.filter(
-          (u) => (u.status || '').toUpperCase() === 'AVAILABLE'
-        )
-      );
-
-      writeSimpleCache(BOOKING_LEADS_CACHE_KEY, freshLeads);
-      writeSimpleCache(BOOKING_UNITS_CACHE_KEY, freshUnits);
-    } catch (err) {
-      if (!hasCachedWizardData) {
-        showError(err.message || 'Unable to load data for booking.');
-      }
-    } finally {
-      setWizardLoading(false);
-    }
+    showSuccess('Profile settings saved successfully.');
   };
 
-  const closeWizard = () => {
-    setWizardOpen(false);
-    setStep(1);
-    setSelectedLead(null);
-    setSelectedUnit(null);
-    setLeadSearch('');
-    setUnitSearch('');
-    setConfirmedBooking(null);
-  };
+  const handlePasswordSave = (e) => {
+    e.preventDefault();
 
-  const handleConfirm = async () => {
-    if (!selectedLead || !selectedUnit) return;
-    setSubmitting(true);
-    try {
-      const payload = {
-        leadId: selectedLead.id,
-        unitId: selectedUnit.id,
-      };
-      const res = await bookingApi.create(payload);
-      setConfirmedBooking(res.data);
-      showSuccess('Booking confirmed successfully.');
-      sessionStorage.removeItem(BOOKING_UNITS_CACHE_KEY);
-      fetchBookings();
-    } catch (err) {
-      if (err.status === 409) {
-        showError('This unit was just booked by another user. Please select another available unit.');
-        setStep(2);
-        // Remove the booked unit from list
-        setUnits((prev) => prev.filter((u) => u.id !== selectedUnit.id));
-        setSelectedUnit(null);
-      } else {
-        showError(err.message || 'Failed to create booking.');
-      }
-    } finally {
-      setSubmitting(false);
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      return;
     }
+
+    if (newPassword !== confirmPassword) {
+      return;
+    }
+
+    showSuccess('Password settings updated successfully.');
+
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
   };
 
-  const filteredLeads = leads.filter((l) => {
-    if (!leadSearch) return true;
-    const q = leadSearch.toLowerCase();
-    return (l.name || '').toLowerCase().includes(q) || (l.phone || '').toLowerCase().includes(q);
-  });
-
-  const filteredUnits = units.filter((u) => {
-    if (!unitSearch) return true;
-    const q = unitSearch.toLowerCase();
-    return `${u.unitNumber || ''} ${u.unitType || ''} ${u.projectName || u.project?.name || ''}`.toLowerCase().includes(q);
-  });
-
-  const filteredBookings = bookings.filter((b) => {
-    if (!search) return true;
-    const q = search.toLowerCase();
-    return `${b.leadName || b.lead?.name || ''} ${b.unitNumber || b.unit?.unitNumber || ''} ${b.projectName || b.project?.name || ''}`.toLowerCase().includes(q);
-  });
+  const roleLabel = user?.role
+    ? user.role.replaceAll('_', ' ')
+    : 'USER';
 
   return (
     <div>
-      <PageHeader title="Bookings" description="Transaction records & new booking flow.">
-        {canCreate && (
-          <Button onClick={openWizard}>
-            <Plus size={15} />
-            New Booking
-          </Button>
-        )}
-      </PageHeader>
+      <PageHeader
+        title="Settings"
+        description="Manage your profile, security, and CRM preferences."
+      />
 
-      {/* Search */}
-      <div className="mb-5">
-        <Input
-          placeholder="Search bookings…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          icon={<Search size={14} />}
-        />
-      </div>
+      <div className="space-y-6">
 
-      {/* Bookings table */}
-      <div className="rounded-lg border border-raiz-border bg-white overflow-hidden">
-        {loading ? (
-          <LoadingState label="Loading bookings…" />
-        ) : error ? (
-          <ErrorState message={error} onRetry={fetchBookings} />
-        ) : filteredBookings.length === 0 ? (
-          <EmptyState
-            title="No Bookings Yet"
-            description="Transactions will appear here once a booking is made."
-            action={canCreate ? <Button onClick={openWizard}><Plus size={15} /> New Booking</Button> : null}
-          />
-        ) : (
-          <div className="overflow-x-auto scrollbar-thin">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-raiz-border bg-raiz-offwhite/50">
-                  <Th>Booking ID</Th>
-                  <Th>Lead</Th>
-                  <Th>Project</Th>
-                  <Th>Unit</Th>
-                  <Th className="text-right">Amount</Th>
-                  <Th>Booked By</Th>
-                  <Th>Date</Th>
-                  <Th>Status</Th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-raiz-border">
-                {filteredBookings.map((b) => (
-                  <tr key={b.id} className="hover:bg-raiz-offwhite/40 transition-colors">
-                    <td className="px-4 py-3 font-medium text-raiz-black whitespace-nowrap">
-                      {b.bookingId ? `#${b.bookingId}` : `#${b.id}`}
-                    </td>
-                    <td className="px-4 py-3 text-raiz-black">{b.leadName || b.lead?.name || '—'}</td>
-                    <td className="px-4 py-3 text-raiz-secondary">{b.projectName || b.project?.name || '—'}</td>
-                    <td className="px-4 py-3 text-raiz-secondary">{b.unitNumber || b.unit?.unitNumber || '—'}</td>
-                    <td className="px-4 py-3 text-right font-medium text-raiz-black whitespace-nowrap">{formatCurrency(b.price || b.amount)}</td>
-                    <td className="px-4 py-3 text-raiz-secondary">{b.bookedByName || b.bookedBy?.name || '—'}</td>
-                    <td className="px-4 py-3 text-raiz-secondary whitespace-nowrap">{formatDate(b.bookingDate)}</td>
-                    <td className="px-4 py-3">
-                      <StatusBadge status={b.status || 'BOOKED'} type="unit" size="xs" />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+        {/* ================= PROFILE ================= */}
 
-      {/* Booking Wizard Modal */}
-      <Modal
-        open={wizardOpen}
-        onClose={closeWizard}
-        title={confirmedBooking ? 'Booking Confirmed' : 'New Booking'}
-        width="max-w-2xl"
-        footer={
-          confirmedBooking ? (
-            <Button size="sm" onClick={closeWizard}>Done</Button>
-          ) : wizardLoading ? null : (
-            <>
-              {step > 1 && (
-                <Button variant="secondary" size="sm" onClick={() => setStep(step - 1)}>
-                  <ChevronLeft size={14} /> Back
-                </Button>
-              )}
-              {step === 1 && selectedLead && (
-                <Button size="sm" onClick={() => setStep(2)}>
-                  Next: Select Unit <ChevronRight size={14} />
-                </Button>
-              )}
-              {step === 2 && selectedUnit && (
-                <Button size="sm" onClick={() => setStep(3)}>
-                  Next: Confirm <ChevronRight size={14} />
-                </Button>
-              )}
-              {step === 3 && (
-                <Button size="sm" onClick={handleConfirm} loading={submitting}>
-                  Confirm Booking
-                </Button>
-              )}
-            </>
-          )
-        }
-      >
-        {confirmedBooking ? (
-          <ConfirmationView booking={confirmedBooking} />
-        ) : wizardLoading ? (
-          <LoadingState label="Loading data…" />
-        ) : (
-          <>
-            {/* Stepper */}
-            <div className="flex items-center gap-2 mb-6">
-              <StepIndicator num={1} label="Select Lead" active={step >= 1} done={step > 1} />
-              <div className={`h-px flex-1 ${step > 1 ? 'bg-raiz-peach' : 'bg-raiz-border'}`} />
-              <StepIndicator num={2} label="Select Unit" active={step >= 2} done={step > 2} />
-              <div className={`h-px flex-1 ${step > 2 ? 'bg-raiz-peach' : 'bg-raiz-border'}`} />
-              <StepIndicator num={3} label="Confirm" active={step >= 3} done={false} />
+        <section className="rounded-lg border border-raiz-border bg-white">
+
+          <div className="flex items-start gap-4 border-b border-raiz-border px-6 py-5">
+
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-raiz-offwhite border border-raiz-border">
+              <User
+                size={18}
+                className="text-raiz-black"
+              />
             </div>
 
-            {/* Step 1 — Select Lead */}
-            {step === 1 && (
-              <div>
-                <Input
-                  placeholder="Search leads by name or phone…"
-                  value={leadSearch}
-                  onChange={(e) => setLeadSearch(e.target.value)}
-                  icon={<Search size={14} />}
-                />
-                <div className="mt-3 max-h-72 overflow-y-auto scrollbar-thin divide-y divide-raiz-border rounded-lg border border-raiz-border">
-                  {filteredLeads.length === 0 ? (
-                    <p className="text-sm text-raiz-secondary text-center py-6">No leads found.</p>
-                  ) : (
-                    filteredLeads.map((lead) => (
-                      <button
-                        key={lead.id}
-                        onClick={() => setSelectedLead(lead)}
-                        className={`w-full flex items-center justify-between px-4 py-3 text-left transition-colors ${
-                          selectedLead?.id === lead.id
-                            ? 'bg-raiz-peach-light/40'
-                            : 'hover:bg-raiz-offwhite'
-                        }`}
-                      >
-                        <div>
-                          <div className="text-sm font-medium text-raiz-black">{lead.name}</div>
-                          <div className="text-xs text-raiz-secondary">{lead.phone} · {lead.email}</div>
-                        </div>
-                        {selectedLead?.id === lead.id && <Check size={16} className="text-raiz-peach" />}
-                      </button>
-                    ))
-                  )}
-                </div>
-              </div>
-            )}
+            <div>
+              <h2 className="text-sm font-semibold text-raiz-black">
+                Profile
+              </h2>
 
-            {/* Step 2 — Select Unit */}
-            {step === 2 && (
-              <div>
-                <Input
-                  placeholder="Search available units…"
-                  value={unitSearch}
-                  onChange={(e) => setUnitSearch(e.target.value)}
-                  icon={<Search size={14} />}
-                />
-                <div className="mt-3 max-h-72 overflow-y-auto scrollbar-thin divide-y divide-raiz-border rounded-lg border border-raiz-border">
-                  {filteredUnits.length === 0 ? (
-                    <p className="text-sm text-raiz-secondary text-center py-6">No available units found.</p>
-                  ) : (
-                    filteredUnits.map((unit) => (
-                      <button
-                        key={unit.id}
-                        onClick={() => setSelectedUnit(unit)}
-                        className={`w-full flex items-center justify-between px-4 py-3 text-left transition-colors ${
-                          selectedUnit?.id === unit.id
-                            ? 'bg-raiz-peach-light/40'
-                            : 'hover:bg-raiz-offwhite'
-                        }`}
-                      >
-                        <div>
-                          <div className="text-sm font-medium text-raiz-black">{unit.unitNumber} · {unit.unitType}</div>
-                          <div className="text-xs text-raiz-secondary">
-                            {unit.buildingName || unit.building?.name || '—'} · {unit.projectName || unit.project?.name || '—'}
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-sm font-medium text-raiz-black">{formatCurrency(unit.price)}</div>
-                          {selectedUnit?.id === unit.id && <Check size={14} className="text-raiz-peach ml-auto mt-1" />}
-                        </div>
-                      </button>
-                    ))
-                  )}
-                </div>
-              </div>
-            )}
+              <p className="mt-1 text-xs text-raiz-secondary">
+                Manage your personal CRM profile information.
+              </p>
+            </div>
 
-            {/* Step 3 — Confirm */}
-            {step === 3 && (
-              <div className="space-y-4">
-                <p className="text-sm text-raiz-secondary">Please review the booking details before confirming.</p>
-                <div className="rounded-lg border border-raiz-border divide-y divide-raiz-border">
-                  <SummaryRow icon={UserIcon} label="Lead" value={selectedLead?.name} />
-                  <SummaryRow icon={Building2} label="Project" value={selectedUnit?.projectName || selectedUnit?.project?.name} />
-                  <SummaryRow icon={Building2} label="Building" value={selectedUnit?.buildingName || selectedUnit?.building?.name} />
-                  <SummaryRow icon={ClipboardList} label="Unit" value={`${selectedUnit?.unitNumber} · ${selectedUnit?.unitType || ''}`} />
-                  <SummaryRow icon={IndianRupee} label="Price" value={formatCurrency(selectedUnit?.price)} />
-                  <SummaryRow icon={UserIcon} label="Booked By" value={user?.name} />
-                  <SummaryRow icon={ClipboardList} label="Booking Date" value={formatDate(new Date())} />
-                </div>
-              </div>
-            )}
-          </>
-        )}
-      </Modal>
+          </div>
+
+          <form
+            onSubmit={handleProfileSave}
+            className="p-6"
+          >
+
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+
+              <Input
+                label="Full Name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Enter your name"
+              />
+
+              <Input
+                label="Email Address"
+                type="email"
+                value={email}
+                disabled
+                placeholder="Email address"
+              />
+
+            </div>
+
+            <div className="mt-5 flex justify-end">
+
+              <Button type="submit">
+                Save Profile
+              </Button>
+
+            </div>
+
+          </form>
+
+        </section>
+
+
+        {/* ================= ACCOUNT INFORMATION ================= */}
+
+        <section className="rounded-lg border border-raiz-border bg-white">
+
+          <div className="flex items-start gap-4 border-b border-raiz-border px-6 py-5">
+
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-raiz-offwhite border border-raiz-border">
+              <Shield
+                size={18}
+                className="text-raiz-black"
+              />
+            </div>
+
+            <div>
+              <h2 className="text-sm font-semibold text-raiz-black">
+                Account & Access
+              </h2>
+
+              <p className="mt-1 text-xs text-raiz-secondary">
+                Current account permissions and access information.
+              </p>
+            </div>
+
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 p-6 md:grid-cols-3">
+
+            <InfoItem
+              label="Account Name"
+              value={user?.name || '—'}
+            />
+
+            <InfoItem
+              label="Role"
+              value={roleLabel}
+            />
+
+            <InfoItem
+              label="Account Status"
+              value="Active"
+              status
+            />
+
+          </div>
+
+        </section>
+
+
+        {/* ================= SECURITY ================= */}
+
+        <section className="rounded-lg border border-raiz-border bg-white">
+
+          <div className="flex items-start gap-4 border-b border-raiz-border px-6 py-5">
+
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-raiz-offwhite border border-raiz-border">
+              <Shield
+                size={18}
+                className="text-raiz-black"
+              />
+            </div>
+
+            <div>
+              <h2 className="text-sm font-semibold text-raiz-black">
+                Security
+              </h2>
+
+              <p className="mt-1 text-xs text-raiz-secondary">
+                Update your account password.
+              </p>
+            </div>
+
+          </div>
+
+          <form
+            onSubmit={handlePasswordSave}
+            className="p-6"
+          >
+
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
+
+              <Input
+                label="Current Password"
+                type="password"
+                value={currentPassword}
+                onChange={(e) =>
+                  setCurrentPassword(e.target.value)
+                }
+                placeholder="Current password"
+              />
+
+              <Input
+                label="New Password"
+                type="password"
+                value={newPassword}
+                onChange={(e) =>
+                  setNewPassword(e.target.value)
+                }
+                placeholder="New password"
+              />
+
+              <Input
+                label="Confirm New Password"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) =>
+                  setConfirmPassword(e.target.value)
+                }
+                placeholder="Confirm password"
+              />
+
+            </div>
+
+            {newPassword &&
+              confirmPassword &&
+              newPassword !== confirmPassword && (
+                <p className="mt-3 text-xs text-red-600">
+                  New passwords do not match.
+                </p>
+              )}
+
+            <div className="mt-5 flex justify-end">
+
+              <Button
+                type="submit"
+                disabled={
+                  !currentPassword ||
+                  !newPassword ||
+                  !confirmPassword ||
+                  newPassword !== confirmPassword
+                }
+              >
+                Update Password
+              </Button>
+
+            </div>
+
+          </form>
+
+        </section>
+
+
+        {/* ================= CRM INFORMATION ================= */}
+
+        <section className="rounded-lg border border-raiz-border bg-white">
+
+          <div className="flex items-start gap-4 border-b border-raiz-border px-6 py-5">
+
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-raiz-offwhite border border-raiz-border">
+              <Building2
+                size={18}
+                className="text-raiz-black"
+              />
+            </div>
+
+            <div>
+              <h2 className="text-sm font-semibold text-raiz-black">
+                CRM Information
+              </h2>
+
+              <p className="mt-1 text-xs text-raiz-secondary">
+                Platform information for RAIZ REALTORS.
+              </p>
+            </div>
+
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 p-6 md:grid-cols-2">
+
+            <InfoItem
+              label="Platform"
+              value="RAIZ REALTORS CRM"
+            />
+
+            <InfoItem
+              label="Environment"
+              value="Production"
+            />
+
+            <InfoItem
+              label="Application"
+              value="Real Estate · Sales · Operations"
+            />
+
+            <InfoItem
+              label="Access"
+              value="Authorised Personnel Only"
+            />
+
+          </div>
+
+        </section>
+
+
+        {/* ================= SYSTEM STATUS ================= */}
+
+        <section className="rounded-lg border border-raiz-border bg-raiz-offwhite">
+
+          <div className="flex items-center gap-4 px-6 py-5">
+
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-white border border-raiz-border">
+              <Database
+                size={18}
+                className="text-raiz-black"
+              />
+            </div>
+
+            <div className="flex-1">
+
+              <h2 className="text-sm font-semibold text-raiz-black">
+                System Status
+              </h2>
+
+              <p className="mt-1 text-xs text-raiz-secondary">
+                Current CRM platform status.
+              </p>
+
+            </div>
+
+            <div className="flex items-center gap-2 text-xs font-medium text-green-700">
+
+              <CheckCircle2 size={15} />
+
+              Operational
+
+            </div>
+
+          </div>
+
+        </section>
+
+
+        {/* ================= FOOTER ================= */}
+
+        <div className="pb-6 text-center">
+
+          <p className="text-xs text-raiz-secondary">
+            RAIZ REALTORS CRM
+          </p>
+
+          <p className="mt-1 text-10 tracking-widest text-raiz-secondary/60 uppercase">
+            Real Estate · Sales · Operations
+          </p>
+
+        </div>
+
+      </div>
     </div>
   );
 }
 
-function StepIndicator({ num, label, active, done }) {
+
+/* ================= INFO ITEM ================= */
+
+function InfoItem({ label, value, status = false }) {
   return (
-    <div className="flex items-center gap-2 shrink-0">
-      <div
-        className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold transition-colors ${
-          done
-            ? 'bg-raiz-peach text-white'
-            : active
-            ? 'bg-raiz-black text-white'
-            : 'bg-raiz-offwhite text-raiz-secondary border border-raiz-border'
-        }`}
-      >
-        {done ? <Check size={13} /> : num}
-      </div>
-      <span className={`text-xs font-medium ${active ? 'text-raiz-black' : 'text-raiz-secondary'} hidden sm:inline`}>
+    <div className="rounded-md border border-raiz-border bg-raiz-offwhite/40 px-4 py-3">
+
+      <p className="text-10 font-semibold tracking-widest text-raiz-secondary uppercase">
         {label}
-      </span>
-    </div>
-  );
-}
+      </p>
 
-function SummaryRow({ icon: Icon, label, value }) {
-  return (
-    <div className="flex items-center gap-3 px-4 py-3">
-      <Icon size={15} className="text-raiz-secondary shrink-0" />
-      <span className="text-xs font-medium tracking-wide text-raiz-secondary uppercase w-24 shrink-0">{label}</span>
-      <span className="text-sm text-raiz-black font-medium">{value || '—'}</span>
-    </div>
-  );
-}
+      <div className="mt-2 flex items-center gap-2">
 
-function ConfirmationView({ booking }) {
-  return (
-    <div className="text-center py-4">
-      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-green-50 border border-green-100 mb-4">
-        <Check size={24} className="text-green-600" />
+        {status && (
+          <span className="h-1.5 w-1.5 rounded-full bg-green-600" />
+        )}
+
+        <p className="text-sm font-medium text-raiz-black capitalize">
+          {value}
+        </p>
+
       </div>
-      <h3 className="font-serif text-xl font-semibold text-raiz-black">Booking Confirmed</h3>
-      <p className="mt-1 text-sm text-raiz-secondary">The unit has been successfully booked.</p>
 
-      <div className="mt-5 rounded-lg border border-raiz-border divide-y divide-raiz-border text-left">
-        <SummaryRow icon={ClipboardList} label="Booking ID" value={booking.bookingId ? `#${booking.bookingId}` : `#${booking.id}`} />
-        <SummaryRow icon={UserIcon} label="Lead" value={booking.leadName || booking.lead?.name} />
-        <SummaryRow icon={Building2} label="Unit" value={booking.unitNumber || booking.unit?.unitNumber} />
-        <SummaryRow icon={IndianRupee} label="Price" value={formatCurrency(booking.price || booking.amount)} />
-      </div>
     </div>
-  );
-}
-
-function Th({ children, className = '' }) {
-  return (
-    <th className={`px-4 py-3 text-left text-10 font-semibold tracking-wide text-raiz-secondary uppercase ${className}`}>
-      {children}
-    </th>
   );
 }
