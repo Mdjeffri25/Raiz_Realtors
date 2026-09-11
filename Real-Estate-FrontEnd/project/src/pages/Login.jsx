@@ -964,7 +964,7 @@ export default function Login() {
                     onChange={(e) =>
                       setEmail(e.target.value)
                     }
-                    placeholder="admin@raizrealtors.com"
+                    placeholder="domain@raizrealtors.com"
                     autoComplete="email"
                     disabled={loading}
                     className="
