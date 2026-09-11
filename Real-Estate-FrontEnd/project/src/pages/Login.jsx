@@ -33,11 +33,14 @@ export default function Login() {
 
   useEffect(() => {
     let cancelled = false;
+    let retryTimer;
 
     const wakeBackend = async () => {
+      if (cancelled) return;
+
       try {
         await axiosClient.get('/health', {
-          timeout: 15000,
+          timeout: 90000,
         });
 
         if (!cancelled) {
@@ -46,6 +49,11 @@ export default function Login() {
       } catch (error) {
         if (!cancelled) {
           setBackendReady(false);
+
+          // Retry after 5 seconds if Render is still waking up
+          retryTimer = setTimeout(() => {
+            wakeBackend();
+          }, 5000);
         }
       }
     };
@@ -54,6 +62,10 @@ export default function Login() {
 
     return () => {
       cancelled = true;
+
+      if (retryTimer) {
+        clearTimeout(retryTimer);
+      }
     };
   }, []);
 

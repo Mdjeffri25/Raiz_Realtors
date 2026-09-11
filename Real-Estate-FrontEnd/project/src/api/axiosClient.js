@@ -12,14 +12,14 @@ const axiosClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 30000,
+  timeout: 120000,
 });
 
 // Separate client for health check.
 // This prevents the health request from triggering itself.
 const healthClient = axios.create({
   baseURL,
-  timeout: 30000,
+  timeout: 120000,
 });
 
 let backendWakePromise = null;
