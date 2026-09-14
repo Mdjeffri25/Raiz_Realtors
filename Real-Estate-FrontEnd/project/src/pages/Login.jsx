@@ -779,48 +779,53 @@ export default function Login() {
                 BRAND ABOVE SIGN IN
             ================================================== */}
 
-            <div
-              className="
-                mb-7
-                pb-5
+   <div
+  className="
+    mb-7
+    pb-5
+    border-b
+    border-[#DDD9D3]
+  "
+  >
+  <div className="flex items-center gap-3">
+    
+    {/* RAIZ LOGO */}
+    <img
+      src="/white-logo.png"
+      alt="RAIZ REALTORS"
+      className="h-12 w-12 object-contain"
+    />
 
-                border-b
-                border-[#DDD9D3]
-              "
-            >
+    {/* BRAND TEXT */}
+    <div>
+      <div
+        className="
+          font-serif
+          text-base
+          sm:text-lg
+          text-[#111111]
+        "
+      >
+        RAIZ REALTORS
+      </div>
 
-              <div
-                className="
-                  font-serif
+      <div
+        className="
+          mt-1.5
+          text-[7px]
+          sm:text-[8px]
+          tracking-[0.28em]
+          text-[#77736E]
+          uppercase
+        "
+      >
+        REAL ESTATE · SALES · OPERATIONS
+      </div>
+    </div>
 
-                  text-base
-                  sm:text-lg
-
-                  text-[#111111]
-                "
-              >
-                RAIZ REALTORS
-              </div>
-
-
-              <div
-                className="
-                  mt-1.5
-
-                  text-[7px]
-                  sm:text-[8px]
-
-                  tracking-[0.28em]
-
-                  text-[#77736E]
-
-                  uppercase
-                "
-              >
-                REAL ESTATE · SALES · OPERATIONS
-              </div>
-
-            </div>
+  </div>
+</div>
+         
 
 
             {/* ==================================================
@@ -1376,7 +1381,7 @@ export default function Login() {
 
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || !backendReady}
                 className="
                   w-full
 
